@@ -1,6 +1,6 @@
 # Despliegue y uso en móvil
 
-Esta entrega se verifica en develop y se ejecuta localmente; no se ha mezclado en main ni publicado. No configurar una URL pública hasta disponer de un alojamiento adecuado y proteger la cuota de IA.
+Esta demo está verificada e integrada en main por petición del usuario; se ejecuta localmente y aún no está publicada. No configurar una URL pública hasta disponer de un alojamiento adecuado y proteger la cuota de IA.
 
 ## Requisitos del alojamiento
 
@@ -16,7 +16,7 @@ No sirve una exportación estática. El SQLite de Node no puede trasladarse tal 
 1. Revisar estado y evidencia de esta versión, corregir pendientes aplicables y respaldar `.data` con proceso detenido.
 2. Verificar secretos/origen/disco y autenticación/límites compartidos si se ofrece acceso público. La cookie anónima del MVP no es una cuenta ni una barrera de registro contra abuso de cuota.
 3. Instalar con `npm ci`, ejecutar unitarias/tipos/lint/build/E2E y revisar la rama.
-4. Integrar develop en main y desplegar mediante el flujo acordado del repositorio. No se ha realizado en esta entrega.
+4. La integración de esta demo en main ya se realizó; desplegar mediante el flujo elegido cuando esté configurado el alojamiento.
 5. Probar desde teléfonos reales: creación, teclado, mantener/soltar, permisos, audio, instalación, cierre y recuperación. Usar HTTPS: localhost del PC no es accesible como localhost del teléfono.
 
 Para una prueba privada en red, un túnel HTTPS al servidor Node es una opción, conservando disco y configuración del host. Requiere elegir y configurar el acceso: no se ha creado un túnel ni abierto la aplicación públicamente.

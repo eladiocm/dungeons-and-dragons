@@ -1,6 +1,6 @@
 # Estado del MVP 0.4.0
 
-5 de noviembre de 2026. Rama `develop`, repositorio original dungeons-and-dragons. Main sigue separada; no se ha publicado esta entrega.
+5 de noviembre de 2026. Repositorio original dungeons-and-dragons. Demo integrada en `main` por petición del usuario; se conserva `develop` para desarrollo. No se ha publicado: está pendiente la elección de alojamiento.
 
 ## Implementado
 
@@ -16,7 +16,7 @@
 
 - Unitarias: **133 correctas**, incluidas reglas, magia, aventuras, SQLite, API, copias, reintentos, controlador de dictado y seguimiento.
 - Tipos, lint y build de producción correctos.
-- E2E: **24 recorridos correctos**, incluidos finales de aventura, recuperación, voz/dictado y PWA.
+- E2E: **27 recorridos correctos**, incluidos finales de aventura, recuperación, voz/dictado y PWA.
 - Auditoría npm: cero vulnerabilidades conocidas en el lockfile comprobado.
 - Navegador: Brave/Chromium aislado, build de producción, API/SQLite reales y proveedor simulado local. RNG controlado únicamente por código de pruebas. Móvil a 320/390/768 px, sin overflow horizontal; capturas de creador y mesa revisadas.
 - Revisión independiente: cuatro hallazgos importantes reproducidos y corregidos con regresiones; última revisión focal 37/37 y veredicto sin bloqueos importantes. Incluye consumo de pociones, concentración de trampa, reacciones de enemigos incapacitados y escape del encuentro. También se corrigieron recuperación estable, reintento de prosa y superposición de controles.
@@ -36,4 +36,4 @@
 
 ## Próximas etapas
 
-Primero probar esta versión con el usuario en equipos reales y decidir alojamiento HTTPS/disco/acceso. Después integrar la versión verificada en main y publicar según ese entorno. Multijugador y mundo abierto requieren sus contratos y pruebas, manteniendo el motor como autoridad.
+Primero probar esta versión con el usuario en equipos reales y decidir alojamiento HTTPS/disco/acceso. La demo ya se integró en main; publicar según el entorno elegido. Multijugador y mundo abierto requieren sus contratos y pruebas, manteniendo el motor como autoridad.

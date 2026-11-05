@@ -89,7 +89,7 @@ El teléfono necesita una dirección **HTTPS accesible y backend activo**; `loca
 
 ## Desarrollo, pruebas y arquitectura
 
-Trabajo en `develop`; `main` sigue separada. El dominio puro está en `src/game`, persistencia/Master/API en `src/server` y mesa/hooks en `src/app`. No hay motor mecánico alternativo en la prosa de la IA.
+Trabajo en `develop`; la demo 0.4.0 está integrada en `main`. El alojamiento está pendiente de elección; todavía no se ha publicado. El dominio puro está en `src/game`, persistencia/Master/API en `src/server` y mesa/hooks en `src/app`. No hay motor mecánico alternativo en la prosa de la IA.
 
 ```powershell
 npm test

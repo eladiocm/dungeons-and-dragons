@@ -1,6 +1,6 @@
 # Plan de aceptación y evidencia
 
-Estado 0.4.0: **133 unitarias y 24 E2E correctas**, tipos/lint/build correctos. Esta matriz conserva los criterios de diseño; la evidencia ejecutada y límites se registran en ESTADO.md. Micrófonos/instalación físicos Android/iOS no se consideran probados por usar simulaciones.
+Estado 0.4.0: **133 unitarias y 27 E2E correctas**, tipos/lint/build correctos. Esta matriz conserva los criterios de diseño; la evidencia ejecutada y límites se registran en ESTADO.md. Micrófonos/instalación físicos Android/iOS no se consideran probados por usar simulaciones.
 
 ## Principios
 
