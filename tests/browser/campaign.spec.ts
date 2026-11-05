@@ -137,3 +137,39 @@ test('creator changes class species and background before review without startin
     fullPage: true,
   });
 });
+
+for (const width of [390, 1280]) {
+  test(`creator step navigation starts at the top at ${width}px`, async ({
+    page,
+  }) => {
+    await quiet(page);
+    await page.setViewportSize({ width, height: 600 });
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Crear personaje' }).click();
+    for (const label of [
+      'Continuar',
+      'Continuar',
+      'Revisar personaje',
+      'Volver',
+    ]) {
+      const next = page.getByRole('button', { name: label, exact: true });
+      await next.scrollIntoViewIfNeeded();
+      expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(100);
+      await next.click();
+      await expect
+        .poll(() => page.evaluate(() => window.scrollY))
+        .toBeLessThanOrEqual(1);
+      await expect(page.locator('#creator-title')).toBeInViewport();
+    }
+    await page
+      .getByRole('navigation', { name: 'Creación de personaje' })
+      .getByRole('button', { name: '1 Identidad' })
+      .click();
+    await expect(page.getByLabel('Nombre', { exact: true })).toHaveValue(
+      'Aren',
+    );
+    await expect
+      .poll(() => page.evaluate(() => window.scrollY))
+      .toBeLessThanOrEqual(1);
+  });
+}

@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import {
   ABILITY_NAMES,
   BACKGROUNDS,
@@ -105,6 +105,12 @@ export function CharacterCreator({
 }) {
   const [draft, setDraft] = useState(() => suggestCharacter('fighter')),
     [step, setStep] = useState(0);
+  const heading = useRef<HTMLHeadingElement>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: each step change resets reading position, not draft edits.
+  useLayoutEffect(() => {
+    heading.current?.focus({ preventScroll: true });
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, [step]);
   const set = <K extends keyof CharacterDraft>(
     key: K,
     value: CharacterDraft[K],
@@ -163,7 +169,7 @@ export function CharacterCreator({
       <div className="creator-heading">
         <div>
           <p className="subtle">La última luz de Valdumbría</p>
-          <h1 id="creator-title">
+          <h1 id="creator-title" ref={heading} tabIndex={-1}>
             {summary ? 'Tu personaje está listo' : 'Da forma a tu aventurero'}
           </h1>
         </div>

@@ -17,3 +17,5 @@ Escritorio: cabecera pequeña y menú a la derecha; escena60%/chat40%; ficha baj
 ```
 
 Revisión frente al encargo: la ilustración aporta el carácter fantástico; controles y cifras conservan legibilidad. El creador sí tiene pasos numerados porque son una secuencia real. Las tarjetas de clase muestran diferencias funcionales. No hay proveedores, barras de instalación ni ajustes fuera del menú.
+
+Navegación del creador: cada cambio de paso vuelve al inicio de la página y lleva el foco al título, incluidos Continuar, Revisar personaje, Volver y los pasos anteriores de la cabecera. Las ediciones del paso actual conservan el desplazamiento.

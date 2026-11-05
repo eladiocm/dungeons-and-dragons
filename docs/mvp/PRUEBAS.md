@@ -78,3 +78,7 @@ Cada archivo E2E simula una dirección de cliente de TEST-NET-2 distinta mediant
 Rama `develop`, versión 0.4.0. `npm test`: 133/133, sin omitidas ni fallidas. `npm run typecheck -- --incremental false`, `npm run lint` y `npm run build`: salida 0. `npm run test:e2e` sobre la compilación final: 24/24; `test-results/.last-run.json` registra `passed`, sin pruebas fallidas. `npm audit --json`: cero vulnerabilidades conocidas. Capturas finales de mesa de escritorio, mesa móvil y revisión de personaje inspeccionadas.
 
 Navegador de pruebas: Brave/Chromium firmado, controlado por Playwright; se usa `PLAYWRIGHT_CHROMIUM_EXECUTABLE` porque el ejecutable Chromium descargado está bloqueado por WDAC en esta máquina. Esta particularidad local no es un requisito del producto. La revisión independiente final no encontró bloqueos importantes después de corregir los cuatro hallazgos con regresiones. Micrófono físico, instalación móvil y publicación HTTPS quedan pendientes como se indica en ESTADO.md.
+
+## Ajuste posterior — navegación del creador
+
+5 de noviembre de 2026: al cambiar de paso se restablece el scroll al inicio y el foco al título. Regresión reproducida antes del arreglo en 390/1280 px (scroll 1167/508 px tras avanzar). Después: cinco E2E del creador/campaña correctas, incluidas dos nuevas pruebas de avance, revisión y vuelta; tipos, lint y build correctos. La suite total contiene ahora 26 pruebas; en este ajuste se ejecutó el archivo afectado con 5, no se repitió la suite completa. Editar elecciones dentro del mismo paso no reinicia la lectura.
