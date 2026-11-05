@@ -31,9 +31,19 @@ La instalación PWA solo instala la interfaz. IA y autoridad de partida siguen n
 
 El usuario solicita integrar esta demo en main y desplegar, consultando antes el alojamiento. La autorización de integración sustituye la restricción anterior de mantener main separada; la elección de plataforma sigue pendiente y no autoriza una suscripción de pago por sí sola.
 
-- **Render Starter + disco persistente**: recomendación para publicar la arquitectura actual sin cambiar el repositorio SQLite. Precio de referencia: 7 USD/mes de cómputo + 0,25 USD/mes por 1 GB de disco; impuestos, ancho de banda y otros consumos pueden sumar. Render Free no ofrece disco persistente.
+- **Render Starter + disco persistente**: opción descartada tras confirmar el usuario que solo desea servicios gratuitos. Permitía conservar SQLite. Precio de referencia: 7 USD/mes de cómputo + 0,25 USD/mes por 1 GB de disco; impuestos, ancho de banda y otros consumos pueden sumar. Render Free no ofrece disco persistente.
 - **Cloudflare Workers + persistencia gestionada (D1 o SQLite de Durable Objects según el adaptador)**: alternativa para priorizar las cuotas gratuitas y la cuenta ya conectada. Necesita adaptar repositorio/transacciones/trabajos/medios/clave de guardados y probar el runtime del framework; no es desplegar el código Node actual sin cambios ni se garantiza que todo entre en límites gratuitos sin medirlo.
 - **Railway**: volúmenes persistentes y plan Hobby desde 5 USD/mes de uso mínimo, con posibles extras. Su plan gratuito tiene crédito de consumo reducido; no debe describirse como servidor permanente ilimitado.
 - **Vercel**: la versión con SQLite local necesita sustituir el almacenamiento; no ofrece el archivo persistente compartido requerido por este repositorio.
 
 Fuentes oficiales consultadas: [Render precios](https://render.com/pricing), [Render discos](https://render.com/docs/disks), [Railway precios](https://railway.com/pricing), [D1 cuotas](https://developers.cloudflare.com/d1/platform/pricing/), [Workers límites](https://developers.cloudflare.com/workers/platform/limits/), [SQLite en Vercel](https://vercel.com/kb/guide/is-sqlite-supported-in-vercel). No se ha contratado alojamiento ni publicado esta demo por esta comparación.
+
+## Restricción vigente: solo servicios gratuitos
+
+El usuario descarta contratar alojamiento de pago y solicita comparar Cloudflare gratuito con Vercel + Supabase. Recomendación para este código: **Vercel Hobby + Supabase Free, conservando Cloudflare Workers AI para texto/imágenes/voz/transcripción**. Es una recomendación pendiente de elección, no un despliegue realizado.
+
+Ambas alternativas necesitan sustituir SQLite local; Vercel + Supabase permitiría conservar la ejecución Next.js y migrar guardado/eventos/idempotencia/trabajos a Postgres, medios a almacenamiento privado con limpieza y clave de copias a secreto de servidor. Cuentas y Realtime quedarían disponibles como base para etapas posteriores, sin declarar implementado el multijugador.
+
+Límites relevantes verificados: Vercel Hobby es para uso personal no comercial y tiene cuotas; Supabase Free incluye 500 MB de base de datos, 1 GB de archivos y puede pausar el proyecto por baja actividad durante 7 días. No activar planes de pago ni complementos facturables. Imágenes/audio deben tener retención acotada. El acceso y las cuotas requieren pruebas antes de publicar.
+
+Fuentes: [Vercel Hobby](https://vercel.com/docs/plans/hobby), [Supabase Free](https://supabase.com/pricing), [pausa por inactividad](https://supabase.com/docs/guides/platform/free-project-pausing). La recomendación de menor adaptación corresponde al análisis del repositorio actual; no garantiza servicio ilimitado ni disponibilidad permanente en planes gratuitos.
