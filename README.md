@@ -25,7 +25,7 @@ Fuentes oficiales, consultadas el 4 de noviembre de 2026:
 
 ## Requisitos y arranque en Windows
 
-Node.js **22.18 o posterior** (este proyecto se verificó con Node 24). npm. Internet para Cloudflare. Se usa exclusivamente `package-lock.json` para instalar las versiones comprobadas.
+Node.js **24.15 o posterior** (este proyecto se verificó con Node 24). npm. Internet para Cloudflare. Se usa exclusivamente `package-lock.json` para instalar las versiones comprobadas.
 
 ```powershell
 cd "C:\Users\PM_EC\Documents\WORKS\dungeons-and-dragons"
@@ -55,7 +55,7 @@ npm run build
 npm start
 ```
 
-Hace falta un servidor Node.js; las rutas de IA impiden exportar esta app como web estática. No se necesita base de datos. El límite de peticiones es básico, por proceso; antes de exponerla públicamente añade autenticación y límites compartidos para proteger tu cuota.
+Hace falta un servidor Node.js; las rutas de IA impiden exportar esta app como web estática. El MVP en develop utiliza SQLite en `.data/game.sqlite` y requiere un disco persistente. El límite de peticiones es básico, por proceso; antes de exponerla públicamente añade autenticación y límites compartidos para proteger tu cuota.
 
 ## Alternativa local: Ollama
 
@@ -142,3 +142,9 @@ La aplicación incluye manifiesto, iconos de instalación, modo independiente y 
 Después de una primera visita completa, puede abrirse sin conexión y mostrar la conversación guardada. Generar escenas, imágenes o voz de Cloudflare sigue requiriendo Internet. Las ilustraciones y audios no se guardan para lectura offline. El service worker cachea únicamente la interfaz pública y recursos estáticos; nunca `/api`, credenciales o cuerpos de peticiones. El guardado sigue perteneciendo a ese navegador/origen: un dominio nuevo no importa automáticamente las partidas del localhost.
 
 El diseño se adapta al ancho móvil, las zonas seguras y el teclado; la entrada mantiene 16px y los controles principales permiten interacción táctil. Se verifican vistas móviles en navegador, no se sustituye la comprobación final en un teléfono físico.
+
+## Guardado del MVP en develop
+
+Las partidas son privadas mediante cookie HttpOnly del navegador; no son cuentas sincronizadas entre dispositivos. No borres las cookies sin exportar antes. El servidor guarda SQLite, claves y archivos en `GAME_DATA_DIR` (por defecto `.data/`, excluido de Git). Configura `APP_ORIGIN` con el origen exacto al usar dominio o red local. No desplegar esta versión sobre disco efímero ni runtime Edge.
+
+Las copias descargadas están cifradas y autenticadas: ocultan secretos del Master y no permiten editar la ficha para importar estadísticas falsas. Solo se pueden importar en una instalación que conserve la misma `.data/save-key`. Para migrar o restaurar el servidor conserva el directorio `.data` completo, incluida esa clave, con el servidor detenido. La importación crea una nueva partida privada, sin sobrescribir la original. No contiene cookie de acceso ni credenciales de IA.
