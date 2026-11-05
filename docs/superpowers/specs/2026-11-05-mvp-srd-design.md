@@ -1,6 +1,6 @@
 # MVP de aventura de rol — propuesta para revisión
 
-Fecha: 5 de noviembre de 2026. Rama: `develop`. Estado: diseño; **no describe funcionalidades ya implementadas**. Base actual: aplicación narrativa 0.3.0.
+Fecha: 5 de noviembre de 2026. Rama: `develop`. Estado: **diseño aprobado por el usuario; implementación en curso**. No describe funcionalidades ya implementadas. Base actual: aplicación narrativa 0.3.0.
 
 ## Acuerdos del usuario
 
@@ -162,7 +162,7 @@ Primera etapa: una persona, una sesión privada. No habilitar salas, invitacione
 
 No declarar terminada una etapa por tener pantallas que aparentan sus resultados. `PRUEBAS.md` define la evidencia de aceptación. El trabajo pendiente se registra explícitamente.
 
-## Decisiones propuestas que debe revisar el usuario
+## Decisiones propuestas y aprobadas por el usuario
 
 - Cuatro especies iniciales (humano, enano, mediano y alto elfo), cuatro trasfondos y catálogo limitado de magia; sin progresión de nivel todavía.
 - Aventura original La última luz de Valdumbría y su estructura; tono de fantasía aventurera con misterio y consecuencias, sin gore necesario.

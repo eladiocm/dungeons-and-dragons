@@ -24,11 +24,11 @@ Rama creada para el nuevo trabajo: `develop`. `main` no se ha integrado ni despl
 - 19 pruebas unitarias del producto existente ejecutadas: 19 correctas.
 - Revisión de construcción independiente: se precisó cómo improvisar hechos persistentes; quedan a revisión del usuario las limitaciones de sincronización/dictado y demás propuestas enumeradas.
 
-## Pendiente antes de implementar
+## Aprobación y ejecución
 
-- Revisar diseño y catálogo propuesto con el usuario, especialmente seguimiento aproximado de voz y dictado al soltar donde no exista reconocimiento en vivo.
-- Confirmar propuesta de cuatro especies, magia acotada, combate sin tablero y aventura original.
-- Crear plan de implementación detallado tras aprobar diseño.
+- Diseño y catálogo aprobados expresamente por el usuario, incluidos seguimiento aproximado y dictado al soltar.
+- Confirmados cuatro especies, magia acotada, combate sin tablero y aventura original.
+- Plan creado: ../superpowers/plans/2026-11-05-srd-mvp.md. Ejecución nativa en develop.
 
 ## Etapas aún no implementadas
 
