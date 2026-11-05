@@ -2336,3 +2336,47 @@ summary::marker {
 .sheet-content .ability-scores {
   padding: 0 0 20px;
 }
+
+.spoken-word {
+  display: inline-block;
+  max-width: 100%;
+  border-radius: 2px;
+  transform-origin: center;
+  vertical-align: baseline;
+}
+.spoken-word.active {
+  color: #ffdb8e;
+  background: #d5ae671f;
+  transform: scale(1.07);
+  text-shadow: 0 0 12px #d5ae6755;
+}
+.composer-buttons {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.microphone {
+  border-color: #63717e;
+  color: #c8d2df;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.microphone.listening {
+  color: #ffe2ac;
+  border-color: var(--gold);
+  background: #605035;
+}
+.dictation-hint {
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--gold);
+  margin-top: 6px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .spoken-word.active {
+    transform: none;
+    text-decoration: underline;
+    text-underline-offset: 4px;
+  }
+}

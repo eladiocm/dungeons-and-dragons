@@ -19,6 +19,7 @@ export default function Home() {
     game.hydrated,
     game.config?.voiceEnabled,
     game.session?.id,
+    !game.busy,
   );
   useEffect(() => {
     try {
@@ -85,6 +86,7 @@ export default function Home() {
             busy={game.busy}
             onCancel={() => setCreating(false)}
             onStart={async (draft) => {
+              narration.arm();
               const ok = await game.create(draft);
               if (ok) setCreating(false);
               return ok;

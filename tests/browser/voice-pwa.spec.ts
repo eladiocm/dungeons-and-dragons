@@ -1,278 +1,385 @@
 import { expect, type Page, test } from '@playwright/test';
+import { create, quiet } from './helpers';
 
-const image = {
-  base64Data:
-    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aK9sAAAAASUVORK5CYII=',
-  mediaType: 'image/png',
-};
-async function setup(page: Page) {
-  await page.route('**/api/config', (route) =>
-    route.fulfill({
-      json: {
-        configured: true,
-        imagesEnabled: true,
-        voiceEnabled: true,
-        provider: 'Cloudflare · Llama 3.3',
-      },
-    }),
-  );
-}
 function silence() {
-  const bytes = Buffer.alloc(44 + 32000);
-  bytes.write('RIFF');
-  bytes.writeUInt32LE(bytes.length - 8, 4);
-  bytes.write('WAVEfmt ', 8);
-  bytes.writeUInt32LE(16, 16);
-  bytes.writeUInt16LE(1, 20);
-  bytes.writeUInt16LE(1, 22);
-  bytes.writeUInt32LE(16000, 24);
-  bytes.writeUInt32LE(32000, 28);
-  bytes.writeUInt16LE(2, 32);
-  bytes.writeUInt16LE(16, 34);
-  bytes.write('data', 36);
-  bytes.writeUInt32LE(32000, 40);
-  return bytes;
+  const b = Buffer.alloc(44 + 64000);
+  b.write('RIFF');
+  b.writeUInt32LE(b.length - 8, 4);
+  b.write('WAVEfmt ', 8);
+  b.writeUInt32LE(16, 16);
+  b.writeUInt16LE(1, 20);
+  b.writeUInt16LE(1, 22);
+  b.writeUInt32LE(16000, 24);
+  b.writeUInt32LE(32000, 28);
+  b.writeUInt16LE(2, 32);
+  b.writeUInt16LE(16, 34);
+  b.write('data', 36);
+  b.writeUInt32LE(64000, 40);
+  return b;
 }
-test('model label hidden; same scene reuses illustration, new location creates one', async ({
-  page,
-}) => {
-  await setup(page);
-  let stories = 0;
-  let images = 0;
-  await page.route('**/api/generate-story', (route) => {
-    stories++;
-    return route.fulfill({
-      json: {
-        narrative:
-          stories === 1
-            ? 'Estás ante una puerta.'
-            : stories === 2
-              ? 'El guardia te saluda.'
-              : 'Llegas a un bosque.',
-        question:
-          stories === 1
-            ? '¿Hablas con el guardia?'
-            : stories === 2
-              ? '¿Le preguntas por la llave?'
-              : '¿Qué sendero sigues?',
-        imagePrompt: stories < 3 ? 'castle gate' : 'forest',
-        shouldIllustrate: stories !== 2,
-      },
-    });
-  });
-  await page.route('**/api/generate-image', (route) => {
-    images++;
-    return route.fulfill({ json: { image } });
-  });
-  await page.goto('/');
-  await expect(
-    page.getByText('Cloudflare · Llama 3.3', { exact: true }),
-  ).toHaveCount(0);
-  await expect(
-    page.getByText('¿Hablas con el guardia?', { exact: false }),
-  ).toBeVisible();
-  await page
-    .getByRole('textbox', { name: 'Tu próxima acción' })
-    .fill('Saludo al guardia');
-  await page.getByRole('button', { name: 'Enviar acción' }).click();
-  await expect(
-    page.getByText('¿Le preguntas por la llave?', { exact: false }),
-  ).toBeVisible();
-  expect(images).toBe(1);
-  await page
-    .getByRole('textbox', { name: 'Tu próxima acción' })
-    .fill('Me marcho al bosque');
-  await page.getByRole('button', { name: 'Enviar acción' }).click();
-  await expect.poll(() => images).toBe(2);
-});
-test('voice speaks complete chat question, repeat reuses audio, reset stops it', async ({
-  page,
-}) => {
-  await setup(page);
-  await page.route('**/api/generate-story', (route) =>
-    route.fulfill({
-      json: {
-        narrative: 'La puerta se abre.',
-        question: '¿Entras o esperas?',
-        imagePrompt: 'door',
-        shouldIllustrate: true,
-      },
+async function voice(page: Page) {
+  await page.route('**/api/config', (r) =>
+    r.fulfill({
+      json: { configured: true, imagesEnabled: false, voiceEnabled: true },
     }),
   );
-  await page.route('**/api/generate-image', (route) =>
-    route.fulfill({ json: { image } }),
+  await page.route('**/speech', (r) =>
+    r.fulfill({ contentType: 'audio/wav', body: silence() }),
   );
-  let requests = 0;
-  await page.route('**/api/narrate', (route) => {
-    requests++;
-    expect(route.request().postDataJSON().text).toContain('¿Entras o esperas?');
-    expect(route.request().postDataJSON().text).not.toContain('imagePrompt');
-    return route.fulfill({ body: silence(), contentType: 'audio/wav' });
+}
+
+test('narration automatically starts after explicit game start with word tracking and pauses', async ({
+  page,
+}) => {
+  await voice(page);
+  let calls = 0;
+  page.on('request', (r) => {
+    if (r.url().endsWith('/speech')) calls++;
   });
   await page.goto('/');
-  await page.getByRole('button', { name: 'Escuchar escena' }).click();
-  await expect(page.getByLabel('Audio de la escena')).toHaveAttribute(
-    'src',
-    /^blob:/,
+  expect(calls).toBe(0);
+  await create(page);
+  await expect(
+    page.getByRole('button', { name: 'Pausar narración' }),
+  ).toBeVisible();
+  await expect(page.locator('.spoken-word.active')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Pausar narración' }).click();
+  const word = await page
+    .locator('.spoken-word.active')
+    .getAttribute('data-word');
+  await page.waitForTimeout(350);
+  expect(
+    await page.locator('.spoken-word.active').getAttribute('data-word'),
+  ).toBe(word);
+  await page.getByRole('button', { name: 'Reproducir narración' }).click();
+  await expect(
+    page.getByRole('button', { name: 'Pausar narración' }),
+  ).toBeVisible();
+  expect(calls).toBe(1);
+});
+test('automatic narration preference stays disabled and replay uses cached audio', async ({
+  page,
+}) => {
+  await voice(page);
+  await page.addInitScript(() =>
+    localStorage.setItem(
+      'dnd-voice-v2',
+      JSON.stringify({ automatic: false, voice: 'nestor' }),
+    ),
   );
+  let calls = 0;
+  page.on('request', (r) => {
+    if (r.url().endsWith('/speech')) calls++;
+  });
+  await create(page);
+  expect(calls).toBe(0);
+  await page.getByRole('button', { name: 'Reproducir narración' }).click();
+  await expect(
+    page.getByRole('button', { name: 'Pausar narración' }),
+  ).toBeVisible();
   await page.getByRole('button', { name: 'Detener narración' }).click();
-  await page.getByRole('button', { name: 'Escuchar escena' }).click();
-  expect(requests).toBe(1);
-  await page
-    .getByLabel('Voz del narrador', { exact: true })
-    .selectOption('device');
-  await expect(page.getByLabel('Audio de la escena')).not.toHaveAttribute(
-    'src',
-    /^blob:/,
-  );
-  await page
-    .getByLabel('Voz del narrador', { exact: true })
-    .selectOption('nestor');
-  page.once('dialog', (dialog) => dialog.accept());
-  await page.getByRole('button', { name: 'Nueva aventura' }).click();
+  await page.getByRole('button', { name: 'Repetir narración' }).click();
+  await expect(
+    page.getByRole('button', { name: 'Pausar narración' }),
+  ).toBeVisible();
+  expect(calls).toBe(1);
+});
+test('stopped playback cannot restart when an older play promise resolves', async ({
+  page,
+}) => {
+  await voice(page);
+  await page.addInitScript(() => {
+    const w = window as unknown as {
+      Audio: unknown;
+      lateAudio: unknown;
+      resolvePlay?: () => void;
+    };
+    w.Audio = class {
+      src = '';
+      preload = 'none';
+      paused = true;
+      duration = 60;
+      currentTime = 0;
+      volume = 1;
+      playbackRate = 1;
+      onended: unknown;
+      ontimeupdate: unknown;
+      onloadedmetadata: unknown;
+      onerror: unknown;
+      constructor() {
+        w.lateAudio = this;
+      }
+      play() {
+        return new Promise<void>((resolve) => {
+          w.resolvePlay = () => {
+            this.paused = false;
+            resolve();
+          };
+        });
+      }
+      pause() {
+        this.paused = true;
+      }
+      removeAttribute() {}
+      load() {}
+    };
+  });
+  await create(page);
   await expect
     .poll(() =>
-      page.locator('audio').evaluate((audio: HTMLAudioElement) => audio.paused),
+      page.evaluate(() =>
+        Boolean(
+          (window as unknown as { resolvePlay?: () => void }).resolvePlay,
+        ),
+      ),
     )
-    .toBeTruthy();
-  const cachedUrls = await page.evaluate(async () => {
-    const keys = await caches.keys();
+    .toBe(true);
+  await page.getByRole('button', { name: 'Detener narración' }).click();
+  await page.evaluate(() =>
+    (window as unknown as { resolvePlay: () => void }).resolvePlay(),
+  );
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (window as unknown as { lateAudio: { paused: boolean } }).lateAudio
+            .paused,
+      ),
+    )
+    .toBe(true);
+  await expect(page.locator('.spoken-word.active')).toHaveCount(0);
+});
+test('hold microphone transcribes into editable draft and never sends on release or a late result', async ({
+  page,
+}) => {
+  await quiet(page);
+  await page.addInitScript(() => {
+    class Recognition {
+      lang = '';
+      continuous = false;
+      interimResults = false;
+      onresult: ((v: unknown) => void) | null = null;
+      onerror = null;
+      onend = null;
+      constructor() {
+        (window as unknown as { recognition: unknown }).recognition = this;
+      }
+      start() {}
+      stop() {}
+      abort() {}
+    }
+    (window as unknown as { SpeechRecognition: unknown }).SpeechRecognition =
+      Recognition;
+  });
+  await create(page);
+  let intents = 0;
+  page.on('request', (r) => {
+    if (r.url().endsWith('/intent')) intents++;
+  });
+  await page.getByLabel('Tu acción').fill('Primero');
+  const mic = page.getByRole('button', { name: 'Mantén pulsado para dictar' }),
+    box = await mic.boundingBox();
+  if (!box) throw new Error('mic missing');
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.evaluate(() =>
+    (
+      window as unknown as { recognition: { onresult: (v: unknown) => void } }
+    ).recognition.onresult({ results: [[{ transcript: 'examino el mapa' }]] }),
+  );
+  await expect(page.getByLabel('Tu acción')).toHaveValue(
+    'Primero examino el mapa',
+  );
+  await page.mouse.up();
+  await page.evaluate(() =>
+    (
+      window as unknown as { recognition: { onresult: (v: unknown) => void } }
+    ).recognition.onresult({
+      results: [[{ transcript: 'resultado atrasado' }]],
+    }),
+  );
+  await expect(page.getByLabel('Tu acción')).toHaveValue(
+    'Primero examino el mapa',
+  );
+  expect(intents).toBe(0);
+  await page.getByLabel('Tu acción').fill('Examino el mapa corregido');
+  await page.getByRole('button', { name: 'Enviar acción' }).click();
+  await expect(page.locator('.chat-message.user')).toHaveText(
+    /Examino el mapa corregido/,
+  );
+  expect(intents).toBe(1);
+});
+test('release before microphone permission stops the granted stream and no transcription runs', async ({
+  page,
+}) => {
+  await quiet(page);
+  await page.addInitScript(() => {
+    const w = window as unknown as {
+      SpeechRecognition: unknown;
+      webkitSpeechRecognition: unknown;
+      grant?: () => void;
+      stops: number;
+    };
+    w.SpeechRecognition = undefined;
+    w.webkitSpeechRecognition = undefined;
+    w.stops = 0;
+    Object.defineProperty(navigator, 'mediaDevices', {
+      value: {
+        getUserMedia: () =>
+          new Promise((resolve) => {
+            w.grant = () =>
+              resolve({
+                getTracks: () => [
+                  {
+                    stop() {
+                      w.stops++;
+                    },
+                  },
+                ],
+              });
+          }),
+      },
+      configurable: true,
+    });
+  });
+  await create(page);
+  const mic = page.getByRole('button', { name: 'Mantén pulsado para dictar' });
+  await mic.focus();
+  await page.keyboard.down('Space');
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        Boolean((window as unknown as { grant?: () => void }).grant),
+      ),
+    )
+    .toBe(true);
+  await page.keyboard.up('Space');
+  await page.evaluate(() =>
+    (window as unknown as { grant: () => void }).grant(),
+  );
+  await expect
+    .poll(() =>
+      page.evaluate(() => (window as unknown as { stops: number }).stops),
+    )
+    .toBe(1);
+  await expect(page.getByLabel('Tu acción')).toHaveValue('');
+});
+test('PWA install stays inside menu and service worker never caches private API responses', async ({
+  page,
+}) => {
+  await quiet(page);
+  await create(page);
+  await page.getByLabel('Menú de partida').click();
+  await page.getByText('Instalar en móvil', { exact: true }).click();
+  await expect(
+    page.getByText(/iPhone: abre esta página en Safari/),
+  ).toBeVisible();
+  const paths = await page.evaluate(async () => {
+    await navigator.serviceWorker.ready;
+    const names = await caches.keys();
     return (
       await Promise.all(
-        keys
-          .filter((key) => key.startsWith('dnd-shell-'))
-          .map(async (key) =>
-            (
-              await (await caches.open(key)).keys()
-            ).map((request) => request.url),
-          ),
+        names.map(async (n) =>
+          (
+            await (await caches.open(n)).keys()
+          ).map((r) => new URL(r.url).pathname),
+        ),
       )
     ).flat();
   });
-  expect(
-    cachedUrls.every((url) => !new URL(url).pathname.startsWith('/api/')),
-  ).toBeTruthy();
+  expect(paths.some((p) => p.startsWith('/api/'))).toBe(false);
+  expect(paths).toContain('/scenes/square.svg');
 });
 
-test('cancelled playback promise cannot restore old status after a new adventure', async ({
+test('recorded fallback transcribes only after release and leaves the result unsent', async ({
   page,
 }) => {
-  await page.addInitScript(() => {
-    HTMLMediaElement.prototype.play = () =>
-      new Promise<void>((_resolve, reject) => {
-        (
-          window as unknown as { rejectNarration: (reason: Error) => void }
-        ).rejectNarration = reject;
-      });
-  });
-  await setup(page);
-  await page.route('**/api/generate-story', (route) =>
-    route.fulfill({
-      json: {
-        narrative: 'Una puerta.',
-        question: '¿Entras?',
-        imagePrompt: 'door',
-        shouldIllustrate: true,
+  await quiet(page);
+  const recording = silence().toString('base64');
+  await page.addInitScript((base64) => {
+    const w = window as unknown as {
+      SpeechRecognition: unknown;
+      webkitSpeechRecognition: unknown;
+      MediaRecorder: unknown;
+    };
+    w.SpeechRecognition = undefined;
+    w.webkitSpeechRecognition = undefined;
+    Object.defineProperty(navigator, 'mediaDevices', {
+      value: {
+        getUserMedia: async () => ({ getTracks: () => [{ stop() {} }] }),
       },
-    }),
+      configurable: true,
+    });
+    w.MediaRecorder = class {
+      static isTypeSupported() {
+        return true;
+      }
+      state = 'inactive';
+      ondataavailable: ((e: unknown) => void) | null = null;
+      onstop: (() => void) | null = null;
+      start() {
+        this.state = 'recording';
+      }
+      stop() {
+        this.state = 'inactive';
+        setTimeout(() => {
+          const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+          this.ondataavailable?.({
+            data: new Blob([bytes], { type: 'audio/wav' }),
+          });
+          this.onstop?.();
+        }, 30);
+      }
+    };
+  }, recording);
+  let transcriptions = 0,
+    intents = 0;
+  await page.route('**/transcribe', (route) => {
+    transcriptions++;
+    const audio = Buffer.from(route.request().postDataJSON().audio, 'base64');
+    expect(audio.toString('ascii', 0, 4)).toBe('RIFF');
+    return route.fulfill({ json: { text: 'Examino la ventana lateral' } });
+  });
+  page.on('request', (r) => {
+    if (r.url().endsWith('/intent')) intents++;
+  });
+  await create(page);
+  const box = await page
+    .getByRole('button', { name: 'Mantén pulsado para dictar' })
+    .boundingBox();
+  if (!box) throw new Error('mic missing');
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await expect(page.getByText(/Grabando… Se transcribirá/)).toBeVisible();
+  expect(transcriptions).toBe(0);
+  await page.mouse.up();
+  await expect(page.getByLabel('Tu acción')).toHaveValue(
+    'Examino la ventana lateral',
   );
-  await page.route('**/api/generate-image', (route) =>
-    route.fulfill({ json: { image } }),
-  );
-  await page.route('**/api/narrate', (route) =>
-    route.fulfill({ body: silence(), contentType: 'audio/wav' }),
-  );
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Escuchar escena' }).click();
-  await expect(page.getByLabel('Audio de la escena')).toHaveAttribute(
-    'src',
-    /^blob:/,
-  );
-  page.once('dialog', (dialog) => dialog.accept());
-  await page.getByRole('button', { name: 'Nueva aventura' }).click();
-  await page.evaluate(() =>
-    (
-      window as unknown as { rejectNarration: (reason: Error) => void }
-    ).rejectNarration(new DOMException('interrupted', 'AbortError')),
-  );
-  await expect(
-    page.getByText('Pulsa reproducir en el audio para comenzar.'),
-  ).toHaveCount(0);
+  expect(transcriptions).toBe(1);
+  expect(intents).toBe(0);
 });
-test('mobile manifest and offline reload preserve saved chat without API caching', async ({
+
+test('speech quota failure leaves text intact and does not retry automatically', async ({
   page,
-  context,
 }) => {
-  await page.setViewportSize({ width: 360, height: 640 });
-  await setup(page);
-  await page.route('**/api/generate-story', (route) =>
-    route.fulfill({
+  await voice(page);
+  await page.unroute('**/speech');
+  let calls = 0;
+  await page.route('**/speech', (route) => {
+    calls++;
+    return route.fulfill({
+      status: 429,
       json: {
-        narrative: 'Una cueva silenciosa.',
-        question: '¿Enciendes una antorcha?',
-        imagePrompt: 'cave',
-        shouldIllustrate: true,
+        error:
+          'La cuota de voz se ha agotado. Puedes usar la voz del dispositivo.',
       },
-    }),
-  );
-  await page.route('**/api/generate-image', (route) =>
-    route.fulfill({ json: { image } }),
-  );
-  await page.goto('/');
-  await expect(
-    page.getByText('Una cueva silenciosa.', { exact: false }),
-  ).toBeVisible();
-  const manifest = await (
-    await page.request.get('/manifest.webmanifest')
-  ).json();
-  expect(manifest.display).toBe('standalone');
-  expect(
-    manifest.icons.some((icon: { sizes: string }) => icon.sizes === '512x512'),
-  ).toBeTruthy();
-  await page.evaluate(async () => {
-    await navigator.serviceWorker.ready;
+    });
   });
-  await expect
-    .poll(() =>
-      page.evaluate(async () =>
-        (await caches.keys()).some((key) => key.startsWith('dnd-shell-')),
-      ),
-    )
-    .toBeTruthy();
-  await expect
-    .poll(() =>
-      page.evaluate(async () => {
-        const keys = await caches.keys();
-        const urls = (
-          await Promise.all(
-            keys
-              .filter((key) => key.startsWith('dnd-shell-'))
-              .map(async (key) =>
-                (
-                  await (await caches.open(key)).keys()
-                ).map((request) => request.url),
-              ),
-          )
-        ).flat();
-        return urls.some(
-          (url) => url.includes('/_next/static/') && url.endsWith('.js'),
-        );
-      }),
-    )
-    .toBeTruthy();
-  await page.unroute('**/api/config');
-  await context.setOffline(true);
-  await page.reload();
-  await expect(
-    page.getByText('Una cueva silenciosa.', { exact: false }),
-  ).toBeVisible();
-  await expect(
-    page.getByText('Sin conexión', { exact: false }).first(),
-  ).toBeVisible();
-  expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= innerWidth,
-    ),
-  ).toBeTruthy();
-  await context.setOffline(false);
+  await create(page);
+  await expect(page.getByText(/La cuota de voz se ha agotado/)).toBeVisible();
+  await expect(page.locator('.chat-message.assistant')).toContainText(
+    'Valdumbría',
+  );
+  expect(calls).toBe(1);
 });

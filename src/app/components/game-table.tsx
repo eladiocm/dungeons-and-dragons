@@ -2,10 +2,12 @@
 import { useEffect, useRef, useState } from 'react';
 import type { CharacterState } from '@/game/types';
 import type { Campaign } from '../hooks/use-campaign';
+import { useDictation } from '../hooks/use-dictation';
 import { CharacterSheet } from './character-sheet';
 import { DiceTray } from './dice-tray';
 import type { Narrator } from './game-menu';
 import { Icon } from './icons';
+import { NarratedText } from './narrated-text';
 import { ScenePanel } from './scene-panel';
 export function GameTable({
   game,
@@ -26,6 +28,13 @@ export function GameTable({
     scroll = useRef<HTMLDivElement>(null),
     follow = useRef(true),
     composer = useRef<HTMLTextAreaElement>(null);
+  const dictation = useDictation(
+    session.id,
+    game.draft,
+    game.setDraft,
+    narration.stop,
+  );
+  const dictating = dictation.phase !== 'idle';
   const latest = session.messages.findLast((m) => m.role === 'assistant');
   // biome-ignore lint/correctness/useExhaustiveDependencies: Message content and pending phase change the scroll height.
   useEffect(() => {
@@ -47,7 +56,8 @@ export function GameTable({
     game.busy ||
     !game.online ||
     Boolean(session.pending) ||
-    session.status === 'ended';
+    session.status === 'ended' ||
+    dictating;
   return (
     <div className="game-table">
       <ScenePanel
@@ -176,7 +186,15 @@ export function GameTable({
                   hero.name
                 )}
               </div>
-              <div className="story-text">{message.content}</div>
+              <NarratedText
+                text={message.content}
+                activeWord={
+                  narration.highlight &&
+                  narration.activeMessageId === message.id
+                    ? narration.activeWord
+                    : -1
+                }
+              />
             </article>
           ))}
           {session.events.at(-1)?.facts.length ? (
@@ -296,6 +314,7 @@ export function GameTable({
             value={game.draft}
             maxLength={2000}
             disabled={session.status === 'ended'}
+            readOnly={dictating}
             onChange={(e) => game.setDraft(e.target.value)}
             placeholder={
               session.pending
@@ -326,16 +345,84 @@ export function GameTable({
                     ? `Asalto ${session.battle.round} · Decide tu acción y finaliza el turno`
                     : 'Acciones libres · Tú decides el siguiente paso'}
             </span>
-            <button
-              type="submit"
-              className="send-button"
-              aria-label="Enviar acción"
-              title="Enviar acción"
-              disabled={blocked || !game.draft.trim()}
-            >
-              <Icon name="send" />
-            </button>
+            <div className="composer-buttons">
+              {dictation.phase === 'transcribing' ? (
+                <button
+                  type="button"
+                  className="icon-button"
+                  aria-label="Cancelar transcripción"
+                  onClick={dictation.cancel}
+                >
+                  <Icon name="close" />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className={`icon-button microphone ${dictating ? 'listening' : ''}`}
+                  aria-label="Mantén pulsado para dictar"
+                  aria-pressed={dictating}
+                  title="Mantén pulsado para dictar; suelta y revisa"
+                  disabled={
+                    !dictation.available ||
+                    game.busy ||
+                    !game.online ||
+                    Boolean(session.pending) ||
+                    session.status === 'ended'
+                  }
+                  onPointerDown={(e) => {
+                    if (e.button !== 0) return;
+                    e.preventDefault();
+                    e.currentTarget.setPointerCapture(e.pointerId);
+                    dictation.start();
+                  }}
+                  onPointerUp={dictation.stop}
+                  onPointerCancel={dictation.cancel}
+                  onLostPointerCapture={() => {
+                    if (
+                      dictation.phase === 'listening' ||
+                      dictation.phase === 'requesting'
+                    )
+                      dictation.stop();
+                  }}
+                  onKeyDown={(e) => {
+                    if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) {
+                      e.preventDefault();
+                      dictation.start();
+                    }
+                  }}
+                  onKeyUp={(e) => {
+                    if (e.key === ' ' || e.key === 'Enter') {
+                      e.preventDefault();
+                      dictation.stop();
+                    }
+                  }}
+                  onBlur={dictation.cancel}
+                >
+                  <Icon name="mic" />
+                </button>
+              )}
+              <button
+                type="submit"
+                className="send-button"
+                aria-label="Enviar acción"
+                title="Enviar acción"
+                disabled={blocked || !game.draft.trim()}
+              >
+                <Icon name="send" />
+              </button>
+            </div>
           </div>
+          {dictation.hint && (
+            <p className="dictation-hint" role="status">
+              {dictation.hint}
+            </p>
+          )}
+          {!dictation.available && (
+            <p className="dictation-hint">
+              El dictado no está disponible en este navegador. Puedes escribir
+              tu acción.
+            </p>
+          )}
         </form>
         {session.battle.inCombat &&
           !session.pending &&
@@ -414,16 +501,6 @@ export function GameTable({
       >
         <DiceTray session={session} game={game} />
       </div>
-      {/* biome-ignore lint/a11y/useMediaCaption: The full narration transcript is the visible chat text. */}
-      <audio
-        ref={narration.audioRef}
-        className="sr-only"
-        onEnded={narration.ended}
-        onPlay={narration.onPlay}
-        onPause={narration.onPause}
-        onError={narration.onAudioError}
-        preload="none"
-      />
     </div>
   );
 }

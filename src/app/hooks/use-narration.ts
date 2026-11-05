@@ -1,293 +1,406 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { GameMessage } from '@/lib/game-contract';
+import type { CampaignMessage } from '@/game/session-types';
 import { isRecord } from '@/lib/game-contract';
-import { type Speaker, splitSpeechText, VOICES } from '@/lib/speech-contract';
+import {
+  narrationChunks,
+  narrationWords,
+  wordAtCharacter,
+  wordAtTime,
+} from '@/lib/narration-progress';
+import { type Speaker, VOICES } from '@/lib/speech-contract';
 
 type Voice = Speaker | 'device';
 type Status = 'idle' | 'loading' | 'playing' | 'paused' | 'ready';
-const SETTINGS_KEY = 'dnd-voice-v1';
+const SETTINGS = 'dnd-voice-v2';
 export function useNarration(
-  messages: GameMessage[],
+  messages: CampaignMessage[],
   hydrated: boolean,
   cloudAvailable: boolean | undefined,
   sessionId?: string,
+  ready = true,
 ) {
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const [voice, setVoice] = useState<Voice>('nestor');
-  const [automatic, setAutomatic] = useState(false);
-  const [status, setStatus] = useState<Status>('idle');
-  const [hint, setHint] = useState<string | null>(null);
-  const [hasAudio, setHasAudio] = useState(false);
-  const [deviceSupported, setDeviceSupported] = useState(false);
-  const controller = useRef<AbortController | null>(null);
-  const generation = useRef(0);
-  const cache = useRef(new Map<string, string[]>());
-  const queue = useRef<string[]>([]);
-  const queueIndex = useRef(0);
-  const autoRef = useRef(false);
-  const interacted = useRef(false);
-  const seen = useRef<string | null>(null);
-  const firstScene = useRef<string | undefined>(undefined);
-  const cloudRef = useRef(cloudAvailable);
+  const [voice, setVoice] = useState<Voice>('nestor'),
+    [automatic, setAutomatic] = useState(true),
+    [status, setStatus] = useState<Status>('idle'),
+    [hint, setHint] = useState<string | null>(null),
+    [hasAudio, setHasAudio] = useState(false),
+    [deviceSupported, setDeviceSupported] = useState(false),
+    [activeMessageId, setActiveMessageId] = useState<string | null>(null),
+    [activeWord, setActiveWord] = useState(-1),
+    [highlight, setHighlight] = useState(true),
+    [rate, setRate] = useState(0.96),
+    [volume, setVolume] = useState(0.9);
+  const audioRef = useRef<HTMLAudioElement | null>(null),
+    generation = useRef(0),
+    controller = useRef<AbortController | null>(null),
+    cache = useRef(new Map<string, string[]>()),
+    armed = useRef(false),
+    seen = useRef(''),
+    autoRef = useRef(true),
+    cloudRef = useRef(cloudAvailable),
+    timer = useRef<ReturnType<typeof setInterval> | undefined>(undefined),
+    settingsReady = useRef(false),
+    lastSession = useRef(sessionId),
+    deviceClock = useRef({
+      elapsed: 0,
+      started: 0,
+      duration: 1,
+      text: '',
+      run: 0,
+      boundaries: false,
+    }),
+    currentSession = useRef(sessionId);
   cloudRef.current = cloudAvailable;
-
+  currentSession.current = sessionId;
   const stop = useCallback(() => {
     generation.current++;
     controller.current?.abort();
+    clearInterval(timer.current);
     const audio = audioRef.current;
-    if (audio) audio.pause();
+    audio?.pause();
+    audioRef.current = null;
     if ('speechSynthesis' in window) window.speechSynthesis.cancel();
-    queue.current = [];
     setStatus('idle');
+    setActiveMessageId(null);
+    setActiveWord(-1);
+    setHasAudio(false);
   }, []);
   const clear = useCallback(() => {
     for (const urls of cache.current.values())
       for (const url of urls) URL.revokeObjectURL(url);
     cache.current.clear();
-    audioRef.current?.removeAttribute('src');
-    setHasAudio(false);
   }, []);
   useEffect(() => {
     setDeviceSupported('speechSynthesis' in window);
     try {
-      const value: unknown = JSON.parse(
-        localStorage.getItem(SETTINGS_KEY) || '{}',
-      );
+      const raw =
+          localStorage.getItem(SETTINGS) ||
+          localStorage.getItem('dnd-voice-v1') ||
+          '{}',
+        value: unknown = JSON.parse(raw);
       if (isRecord(value)) {
         if (
           value.voice === 'device' ||
-          VOICES.some((option) => option.id === value.voice)
+          VOICES.some((v) => v.id === value.voice)
         )
           setVoice(value.voice as Voice);
-        if (value.automatic === true) {
-          setAutomatic(true);
-          autoRef.current = true;
+        if (typeof value.automatic === 'boolean') {
+          autoRef.current = value.automatic;
+          setAutomatic(value.automatic);
         }
+        if (typeof value.highlight === 'boolean') setHighlight(value.highlight);
+        if (
+          typeof value.rate === 'number' &&
+          value.rate >= 0.7 &&
+          value.rate <= 1.3
+        )
+          setRate(value.rate);
+        if (
+          typeof value.volume === 'number' &&
+          value.volume >= 0 &&
+          value.volume <= 1
+        )
+          setVolume(value.volume);
       }
-    } catch {
-      /* Voice preferences must not affect the saved game. */
-    }
+    } catch {}
+    settingsReady.current = true;
     return () => {
       stop();
       clear();
     };
   }, [stop, clear]);
   useEffect(() => {
+    if (settingsReady.current)
+      try {
+        localStorage.setItem(
+          SETTINGS,
+          JSON.stringify({ voice, automatic, highlight, rate, volume }),
+        );
+      } catch {}
+  }, [voice, automatic, highlight, rate, volume]);
+  useEffect(() => {
     if (cloudAvailable === false && deviceSupported && voice !== 'device')
       setVoice('device');
   }, [cloudAvailable, deviceSupported, voice]);
-  const remember = (nextVoice: Voice, nextAuto: boolean) => {
-    try {
-      localStorage.setItem(
-        SETTINGS_KEY,
-        JSON.stringify({ voice: nextVoice, automatic: nextAuto }),
-      );
-    } catch {
-      /* Optional preference. */
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.playbackRate = rate;
+      audioRef.current.volume = volume;
     }
-  };
-  const playCurrent = useCallback(async () => {
-    const audio = audioRef.current;
-    const run = generation.current;
-    if (!audio) return;
+  }, [rate, volume]);
+  const play = useCallback(async (audio: HTMLAudioElement, run: number) => {
     try {
       await audio.play();
-      if (run !== generation.current) return;
+      if (run !== generation.current) {
+        audio.pause();
+        return;
+      }
       setStatus('playing');
       setHint(null);
     } catch {
-      if (run !== generation.current) return;
+      if (run !== generation.current) {
+        audio.pause();
+        return;
+      }
       setStatus('ready');
-      setHint('Pulsa reproducir en el audio para comenzar.');
+      setHint(
+        'El navegador espera una pulsación. Pulsa reproducir para escuchar la escena.',
+      );
     }
   }, []);
   const listen = useCallback(
-    async (message: GameMessage) => {
+    async (message: CampaignMessage) => {
       if (message.role !== 'assistant') return;
       stop();
-      interacted.current = true;
+      armed.current = true;
       setHint(null);
       const run = generation.current;
+      setActiveMessageId(message.id);
+      setActiveWord(-1);
       if (voice === 'device') {
         if (!('speechSynthesis' in window)) {
-          setHint('Este navegador no ofrece una voz del dispositivo.');
+          setHint(
+            'Este navegador no ofrece voz del dispositivo. Puedes seguir leyendo.',
+          );
           return;
         }
         const utterance = new SpeechSynthesisUtterance(message.content);
         utterance.lang = 'es';
-        utterance.rate = 0.92;
+        utterance.rate = rate;
+        utterance.volume = volume;
+        const voices = window.speechSynthesis.getVoices();
         utterance.voice =
-          window.speechSynthesis
-            .getVoices()
-            .find(
-              (option) => option.lang.startsWith('es') && option.localService,
-            ) ||
-          window.speechSynthesis
-            .getVoices()
-            .find((option) => option.lang.startsWith('es')) ||
+          voices.find((v) => v.lang.startsWith('es') && v.localService) ||
+          voices.find((v) => v.lang.startsWith('es')) ||
           null;
+        const clock = {
+          elapsed: 0,
+          started: 0,
+          duration: Math.max(
+            1,
+            (narrationWords(message.content).length * 0.43) / rate,
+          ),
+          text: message.content,
+          run,
+          boundaries: false,
+        };
+        deviceClock.current = clock;
         utterance.onstart = () => {
-          if (run === generation.current) setStatus('playing');
+          if (run !== generation.current) return;
+          setStatus('playing');
+          clock.started = performance.now();
+          setActiveWord(0);
+          timer.current = setInterval(() => {
+            if (
+              clock.boundaries ||
+              run !== generation.current ||
+              !clock.started
+            )
+              return;
+            setActiveWord(
+              wordAtTime(
+                clock.text,
+                clock.elapsed + (performance.now() - clock.started) / 1000,
+                clock.duration,
+              ),
+            );
+          }, 120);
+        };
+        utterance.onboundary = (e) => {
+          if (run !== generation.current || !clock.started) return;
+          clock.boundaries = true;
+          setActiveWord(wordAtCharacter(message.content, e.charIndex));
         };
         utterance.onend = () => {
-          if (run === generation.current) setStatus('idle');
+          if (run === generation.current) {
+            clearInterval(timer.current);
+            setStatus('idle');
+            setActiveWord(-1);
+          }
         };
         utterance.onerror = () => {
           if (run === generation.current) {
+            clearInterval(timer.current);
             setStatus('idle');
-            setHint('No se pudo usar la voz del dispositivo. Prueba otra voz.');
+            setHint(
+              'La voz del dispositivo no pudo completarse. Puedes volver a reproducir.',
+            );
           }
         };
-        setHasAudio(false);
+        setStatus('loading');
         window.speechSynthesis.speak(utterance);
         return;
       }
-      if (cloudRef.current !== true) {
+      if (cloudRef.current !== true || !sessionId) {
+        setStatus('idle');
         setHint(
-          'La voz natural no está disponible. Puedes elegir la voz del dispositivo.',
+          'La voz natural no está disponible. Elige la voz del dispositivo en el menú.',
         );
         return;
       }
-      const key = `${voice}\n${message.content}`;
+      const key = `${sessionId}:${message.id}:${voice}:${message.content}`,
+        chunks = narrationChunks(message.content);
       let urls = cache.current.get(key);
       if (!urls) {
-        const currentController = new AbortController();
-        controller.current = currentController;
+        const abort = new AbortController();
+        controller.current = abort;
         setStatus('loading');
         const created: string[] = [];
         try {
-          for (const [chunkIndex, text] of splitSpeechText(
-            message.content,
-          ).entries()) {
-            const response = await fetch(
-              sessionId ? `/api/sessions/${sessionId}/speech` : '/api/narrate',
-              {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(
-                  sessionId
-                    ? { messageId: message.id, chunkIndex, speaker: voice }
-                    : { text, speaker: voice },
-                ),
-                signal: AbortSignal.any([
-                  currentController.signal,
-                  AbortSignal.timeout(70000),
-                ]),
-              },
-            );
+          for (const [chunkIndex] of chunks.entries()) {
+            const response = await fetch(`/api/sessions/${sessionId}/speech`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                messageId: message.id,
+                chunkIndex,
+                speaker: voice,
+              }),
+              signal: AbortSignal.any([
+                abort.signal,
+                AbortSignal.timeout(70000),
+              ]),
+            });
             if (!response.ok) {
-              const result: unknown = await response.json();
-              throw new Error(
-                isRecord(result) && typeof result.error === 'string'
-                  ? result.error
-                  : 'No se pudo preparar la voz.',
-              );
+              const data = await response.json();
+              throw new Error(data.error || 'No se pudo preparar la voz.');
             }
             const blob = await response.blob();
-            if (run !== generation.current || currentController.signal.aborted)
-              return;
+            if (run !== generation.current || abort.signal.aborted) break;
             created.push(URL.createObjectURL(blob));
+          }
+          if (run !== generation.current || abort.signal.aborted) {
+            for (const url of created) URL.revokeObjectURL(url);
+            return;
           }
           urls = created;
           while (cache.current.size >= 4) {
             const oldest = cache.current.entries().next().value;
             if (!oldest) break;
-            for (const url of oldest[1]) URL.revokeObjectURL(url);
+            oldest[1].forEach((url) => {
+              URL.revokeObjectURL(url);
+            });
             cache.current.delete(oldest[0]);
           }
           cache.current.set(key, urls);
-        } catch (error) {
-          for (const url of created) URL.revokeObjectURL(url);
-          if (run === generation.current && !currentController.signal.aborted) {
+        } catch (e) {
+          created.forEach((url) => {
+            URL.revokeObjectURL(url);
+          });
+          if (run === generation.current && !abort.signal.aborted) {
             setStatus('idle');
             setHint(
-              error instanceof Error
-                ? error.message
-                : 'No se pudo preparar la voz.',
+              e instanceof Error
+                ? e.message
+                : 'No se pudo preparar la narración.',
             );
           }
           return;
-        } finally {
-          if (run !== generation.current)
-            for (const url of created) URL.revokeObjectURL(url);
         }
       }
-      if (run !== generation.current || !urls.length || !audioRef.current)
-        return;
-      queue.current = urls;
-      queueIndex.current = 0;
-      audioRef.current.src = urls[0];
-      audioRef.current.playbackRate = 0.96;
+      if (run !== generation.current || !urls.length) return;
+      const audio = new Audio();
+      audioRef.current = audio;
+      audio.preload = 'auto';
+      audio.playbackRate = rate;
+      audio.volume = volume;
+      let index = 0;
+      const progress = () => {
+        if (run !== generation.current) return;
+        const chunk = chunks[index],
+          word = wordAtTime(chunk.text, audio.currentTime, audio.duration);
+        setActiveWord(word < 0 ? -1 : chunk.firstWord + word);
+      };
+      audio.ontimeupdate = progress;
+      audio.onloadedmetadata = progress;
+      audio.onended = () => {
+        if (run !== generation.current) return;
+        index++;
+        if (urls?.[index]) {
+          audio.src = urls[index];
+          void play(audio, run);
+        } else {
+          setStatus('idle');
+          setActiveWord(-1);
+        }
+      };
+      audio.onerror = () => {
+        if (run === generation.current) {
+          setStatus('idle');
+          setHint(
+            'El audio no pudo reproducirse. Puedes volver a escuchar la escena.',
+          );
+        }
+      };
+      audio.src = urls[0];
       setHasAudio(true);
-      await playCurrent();
+      setActiveWord(0);
+      await play(audio, run);
     },
-    [voice, stop, playCurrent, sessionId],
+    [voice, rate, volume, sessionId, stop, play],
   );
-
   useEffect(() => {
-    const current = messages[0]?.id;
-    if (firstScene.current && firstScene.current !== current) {
+    if (lastSession.current !== sessionId) {
       stop();
       clear();
-      seen.current = null;
+      seen.current = '';
+      lastSession.current = sessionId;
     }
-    firstScene.current = current;
-  }, [messages, stop, clear]);
+  }, [sessionId, stop, clear]);
   useEffect(() => {
-    if (!hydrated) return;
-    const latest = messages.findLast((message) => message.role === 'assistant');
-    if (!latest || latest.id === seen.current) return;
-    seen.current = latest.id;
-    if (autoRef.current && interacted.current) void listen(latest);
-  }, [messages, hydrated, listen]);
-
-  const changeVoice = (value: Voice) => {
+    if (!hydrated || !ready || !settingsReady.current) return;
+    const latest = messages.findLast((m) => m.role === 'assistant');
+    if (!latest) return;
+    const key = `${latest.id}:${latest.content}`;
+    if (key === seen.current) return;
+    if (!autoRef.current || !armed.current) return;
+    seen.current = key;
+    void listen(latest);
+  }, [messages, hydrated, ready, listen]);
+  const changeVoice = (next: Voice) => {
     stop();
-    audioRef.current?.removeAttribute('src');
-    audioRef.current?.load();
-    setHasAudio(false);
-    setVoice(value);
-    remember(value, autoRef.current);
     setHint(null);
+    setVoice(next);
   };
   const toggleAutomatic = (enabled: boolean) => {
     autoRef.current = enabled;
     setAutomatic(enabled);
-    remember(voice, enabled);
-    if (enabled) {
-      const latest = messages.findLast(
-        (message) => message.role === 'assistant',
-      );
-      if (latest) {
-        seen.current = latest.id;
-        void listen(latest);
-      } else interacted.current = true;
-    } else stop();
+    if (!enabled) {
+      stop();
+      return;
+    }
+    armed.current = true;
+    const latest = messages.findLast((m) => m.role === 'assistant');
+    if (latest && ready) {
+      seen.current = `${latest.id}:${latest.content}`;
+      void listen(latest);
+    }
   };
   const pauseOrResume = () => {
     if (voice === 'device') {
+      const clock = deviceClock.current;
       if (status === 'paused') {
+        clock.started = performance.now();
         window.speechSynthesis.resume();
         setStatus('playing');
-      } else {
+      } else if (status === 'playing') {
+        if (clock.started)
+          clock.elapsed += (performance.now() - clock.started) / 1000;
+        clock.started = 0;
         window.speechSynthesis.pause();
         setStatus('paused');
       }
-    } else if (status === 'paused' || status === 'ready') void playCurrent();
-    else {
-      audioRef.current?.pause();
-      setStatus('paused');
+    } else {
+      const audio = audioRef.current;
+      if (!audio) return;
+      if (status === 'paused' || status === 'ready')
+        void play(audio, generation.current);
+      else {
+        audio.pause();
+        setStatus('paused');
+      }
     }
-  };
-  const ended = () => {
-    if (!audioRef.current?.ended || !queue.current.length) return;
-    queueIndex.current++;
-    const next = queue.current[queueIndex.current];
-    if (next && audioRef.current) {
-      audioRef.current.src = next;
-      void playCurrent();
-    } else setStatus('idle');
   };
   return {
     voice,
@@ -302,21 +415,27 @@ export function useNarration(
     changeVoice,
     toggleAutomatic,
     pauseOrResume,
-    ended,
-    onPlay: () => {
-      if (!audioRef.current?.paused && audioRef.current?.getAttribute('src'))
-        setStatus('playing');
+    activeMessageId,
+    activeWord,
+    highlight,
+    setHighlight,
+    rate,
+    volume,
+    changeRate: (next: number) => {
+      if (voice === 'device') stop();
+      setRate(next);
     },
-    onPause: () => {
-      if (audioRef.current?.paused && queue.current.length)
-        setStatus((previous) => (previous === 'playing' ? 'paused' : previous));
+    changeVolume: (next: number) => {
+      if (voice === 'device') stop();
+      setVolume(next);
     },
-    onAudioError: () => {
-      if (!audioRef.current?.getAttribute('src')) return;
-      setStatus('idle');
-      setHint(
-        'El audio no pudo reproducirse. Puedes volver a escuchar la escena.',
-      );
+    arm: () => {
+      armed.current = true;
+      seen.current = '';
     },
+    ended: () => {},
+    onPlay: () => {},
+    onPause: () => {},
+    onAudioError: () => {},
   };
 }

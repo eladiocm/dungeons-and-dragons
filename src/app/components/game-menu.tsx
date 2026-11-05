@@ -119,6 +119,7 @@ export function GameMenu({
                   disabled={game.busy}
                   onClick={() => {
                     narration.stop();
+                    narration.arm();
                     void game.resume(s.id);
                     if (menu.current) menu.current.open = false;
                   }}
@@ -158,6 +159,44 @@ export function GameMenu({
               <option value="device">Voz del dispositivo</option>
             </select>
           </label>
+          <label>
+            Velocidad
+            <select
+              aria-label="Velocidad de narración"
+              value={narration.rate}
+              onChange={(e) => narration.changeRate(Number(e.target.value))}
+            >
+              {[0.7, 0.85, 0.96, 1.1, 1.3].map((v) => (
+                <option value={v} key={v}>
+                  {v}×
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Volumen
+            <input
+              aria-label="Volumen de narración"
+              type="range"
+              min="0"
+              max="1"
+              step=".05"
+              value={narration.volume}
+              onChange={(e) => narration.changeVolume(Number(e.target.value))}
+            />
+          </label>
+          <label className="toggle-setting">
+            <input
+              type="checkbox"
+              checked={narration.highlight}
+              onChange={(e) => narration.setHighlight(e.target.checked)}
+            />
+            Resaltar el texto narrado
+          </label>
+          <p>
+            El seguimiento con voz natural es aproximado. La voz del dispositivo
+            usa sus marcas de palabra cuando están disponibles.
+          </p>
           <small>
             La voz natural y las ilustraciones comparten la cuota gratuita del
             servicio.
