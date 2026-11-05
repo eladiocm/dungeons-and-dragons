@@ -3,6 +3,7 @@ import {
   condition,
   damageActor,
   distance,
+  dodging,
   effectiveAc,
   endConcentration,
   hasCondition,
@@ -391,6 +392,12 @@ function spellAttack(
   );
   const advantage =
     hasCondition(caster, 'invisible') ||
+    target.conditions.some(
+      (c) =>
+        c.id === 'helpedAgainst' &&
+        c.data?.team === result.state.teams[caster.id] &&
+        c.data?.helperId !== caster.id,
+    ) ||
     hasCondition(target, 'guidingBolt') ||
     (hasCondition(target, 'prone') && span <= 1.5) ||
     ['unconscious', 'restrained', 'paralyzed', 'stunned'].some((id) =>
@@ -401,7 +408,9 @@ function spellAttack(
     ['poisoned', 'blinded', 'prone', 'restrained', 'frightened', 'sap'].some(
       (id) => hasCondition(caster, id),
     ) ||
-    hasCondition(target, 'dodging') ||
+    (dodging(target) &&
+      !hasCondition(target, 'blinded') &&
+      !hasCondition(caster, 'invisible')) ||
     hasCondition(target, 'invisible') ||
     (hasCondition(target, 'prone') && span > 1.5);
   const roll =
@@ -424,7 +433,15 @@ function spellAttack(
   caster.conditions = caster.conditions.filter(
     (c) => c.id !== 'sap' && c.source !== 'hiding',
   );
-  target.conditions = target.conditions.filter((c) => c.id !== 'guidingBolt');
+  target.conditions = target.conditions.filter(
+    (c) =>
+      c.id !== 'guidingBolt' &&
+      !(
+        c.id === 'helpedAgainst' &&
+        c.data?.team === result.state.teams[caster.id] &&
+        c.data?.helperId !== caster.id
+      ),
+  );
   result.attack = roll;
   return roll;
 }

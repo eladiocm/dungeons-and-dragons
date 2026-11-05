@@ -44,6 +44,8 @@ export interface BattleState {
   >;
 }
 export interface RollLog {
+  groupId?: string;
+  actorId: string;
   label: string;
   sides: number;
   values: number[];

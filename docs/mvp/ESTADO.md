@@ -33,3 +33,9 @@ Rama creada para el nuevo trabajo: `develop`. `main` no se ha integrado ni despl
 ## Etapas aún no implementadas
 
 Motor SRD y creación; repositorio de sesión; módulo de aventura; mesa nueva y dados; dictado; nueva narración automática con resaltado; E2E de partida completa; integración y despliegue. No marcarlas terminadas por la existencia de estos documentos.
+
+## Motor implementado en develop (todavía sin mesa nueva)
+
+Tareas 1 a 4: creación y catálogo; dados, daño, muerte y descansos; armas/conjuros/condiciones; sesión de aventura con misión, caminos alternativos y finales. El motor tiene pruebas de ruta social, sigilo y combate, botín único, inspiración, azar persistible por grupos y proyección sin secretos. Incluye tipos de participantes y orden de iniciativa para futuras salas, sin multijugador conectado.
+
+Verificación actual: 97 pruebas unitarias correctas, tipos y lint. La interfaz y servidor siguen en la base 0.3.0 hasta conectar las tareas siguientes. Pendientes: persistencia HTTP/SQLite, Master, creador y mesa visual, controles nuevos de voz/dictado y E2E de producto.

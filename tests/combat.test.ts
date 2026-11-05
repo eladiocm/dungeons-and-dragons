@@ -243,3 +243,42 @@ test('species saving throw benefits apply to their actual effects', () => {
     true,
   );
 });
+
+test('Help grants the next allied attacker advantage but not the helper itself', () => {
+  const state = createBattle(
+    [hero('helper'), hero('ally'), hero('target')],
+    'ally',
+  );
+  state.teams.ally = 'heroes';
+  state.actors.target.conditions.push({
+    id: 'helpedAgainst',
+    source: 'action',
+    data: { team: 'heroes', helperId: 'helper' },
+  });
+  const hit = attack(
+    state,
+    'ally',
+    'target',
+    { weaponId: 'flail' },
+    sequence(2, 15, 1),
+  );
+  assert.equal(hit.attack?.selection, 'highest');
+  assert.equal(hit.state.actors.target.hp.current, 8);
+  assert.ok(
+    !hit.state.actors.target.conditions.some((c) => c.id === 'helpedAgainst'),
+  );
+});
+
+test('Dodge grants Dexterity save advantage while the actor can move and see', () => {
+  const dodger = hero();
+  dodger.conditions.push({ id: 'dodging' });
+  const result: BattleResolution = {
+    state: createBattle([dodger], 'fighter'),
+    rolls: [],
+    facts: [],
+  };
+  assert.equal(
+    savingThrow(result, 'fighter', 'dex', 12, sequence(1, 15)),
+    true,
+  );
+});

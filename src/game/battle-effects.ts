@@ -20,6 +20,17 @@ export const isHero = (actor: Combatant): actor is CharacterState =>
   'classId' in actor;
 export const hasCondition = (actor: Combatant, id: string) =>
   actor.conditions.some((c) => c.id === id);
+export const dodging = (actor: Combatant) =>
+  hasCondition(actor, 'dodging') &&
+  actor.speed > 0 &&
+  ![
+    'incapacitated',
+    'unconscious',
+    'paralyzed',
+    'stunned',
+    'restrained',
+    'grappled',
+  ].some((id) => hasCondition(actor, id));
 export const distance = (a: Position, b: Position) =>
   Math.hypot(a.x - b.x, a.y - b.y);
 export function effectiveAc(actor: Combatant): number {
@@ -61,12 +72,23 @@ export function recorded(
   result: BattleResolution,
   label: string,
   roller: Roller,
+  actorId = result.state.activeId,
 ): Roller {
+  const scoped = roller.scope?.(label, actorId) || roller;
+  let group: import('./combat-types.ts').RollLog | undefined;
   return (sides) => {
-    const value = roller(sides);
-    const last = result.rolls.at(-1);
-    if (last?.label === label && last.sides === sides) last.values.push(value);
-    else result.rolls.push({ label, sides, values: [value] });
+    const value = scoped(sides);
+    if (group && group.sides === sides) group.values.push(value);
+    else {
+      group = {
+        actorId,
+        label,
+        sides,
+        values: [value],
+        groupId: scoped.groupId,
+      };
+      result.rolls.push(group);
+    }
     return value;
   };
 }
@@ -114,17 +136,20 @@ export function savingThrow(
     bonus += rollDice(
       1,
       4,
-      recorded(result, `Bendición: ${actor.name}`, roller),
+      recorded(result, `Bendición: ${actor.name}`, roller, actorId),
     ).total;
   const roll = resolveD20(
     {
       kind: 'save',
       bonus,
       dc,
-      advantage: options.advantage || traitAdvantage,
+      advantage:
+        options.advantage ||
+        traitAdvantage ||
+        (ability === 'dex' && dodging(actor)),
       disadvantage: options.disadvantage,
     },
-    recorded(result, `Salvación de ${actor.name}`, roller),
+    recorded(result, `Salvación de ${actor.name}`, roller, actorId),
   );
   result.facts.push(
     `${actor.name}: salvación ${roll.total} frente a ${dc}, ${roll.success ? 'superada' : 'fallida'}.`,

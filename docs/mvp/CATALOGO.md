@@ -1,6 +1,6 @@
 # Manifiesto de contenido
 
-Estado al iniciar implementación: **creación y ficha calculada**; combate, conjuros y escenas aún no habilitados. No confundir datos de una opción con su resolución completa.
+Estado del motor: creación, reglas, combate, efectos de magia y aventura implementados como funciones puras y verificados por pruebas. Todavía no están conectados a la nueva mesa ni al servidor de sesiones. No confundir este avance con un producto terminado.
 
 - Reglas: SRD 5.2.1, español; referencias en REGLAS.md.
 - Nivel 1; guerrero, pícaro, clérigo, mago.

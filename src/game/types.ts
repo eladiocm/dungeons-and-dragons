@@ -94,6 +94,7 @@ export interface InventoryItem {
   weight: number;
   equipped?: boolean;
   mission?: boolean;
+  conditions?: Condition[];
 }
 export interface InnateMagic extends MagicChoice {
   remaining: number;
@@ -154,7 +155,11 @@ export interface CharacterState {
   alignment: string;
   xp: number;
 }
-export type Roller = (sides: number) => number;
+export interface Roller {
+  (sides: number): number;
+  scope?: (label: string, actorId: string) => Roller;
+  groupId?: string;
+}
 export type HealthState = Pick<
   CharacterState,
   | 'hp'

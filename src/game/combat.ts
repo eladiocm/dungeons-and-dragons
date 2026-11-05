@@ -3,6 +3,7 @@ import {
   condition,
   damageActor,
   distance,
+  dodging,
   effectiveAc,
   hasCondition,
   isHero,
@@ -213,6 +214,12 @@ export function attackTest(
   const advantage =
     hasCondition(actor, 'invisible') ||
     target.conditions.some(
+      (c) =>
+        c.id === 'helpedAgainst' &&
+        c.data?.team === state.teams[actorId] &&
+        c.data?.helperId !== actorId,
+    ) ||
+    target.conditions.some(
       (c) => c.id === 'vex' && c.data?.attackerId === actorId,
     ) ||
     hasCondition(target, 'guidingBolt') ||
@@ -230,7 +237,9 @@ export function attackTest(
       (c) => hasCondition(actor, c),
     ) ||
     hasCondition(target, 'invisible') ||
-    hasCondition(target, 'dodging') ||
+    (dodging(target) &&
+      !hasCondition(target, 'blinded') &&
+      !hasCondition(actor, 'invisible')) ||
     (hasCondition(target, 'prone') && span > 1.5);
   return {
     kind: 'attack',
@@ -315,6 +324,11 @@ export function attack(
   target.conditions = target.conditions.filter(
     (c) =>
       c.id !== 'guidingBolt' &&
+      !(
+        c.id === 'helpedAgainst' &&
+        c.data?.team === state.teams[actorId] &&
+        c.data?.helperId !== actorId
+      ) &&
       !(c.id === 'vex' && c.data?.attackerId === actorId),
   );
   const mastery =
