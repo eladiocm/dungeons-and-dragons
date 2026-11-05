@@ -1,69 +1,221 @@
-'use client'
-
-import { Conversation, ConversationContent, ConversationScrollButton } from "@/components/conversation";
-import { GameInput } from "./componentes/game-input";
-import { GameLoader } from "./componentes/game-loader";
-import { GameMessage } from "./componentes/game-message";
-import { useZombieGame } from "./hooks/use-zombie-game";
-import { useColorExtractor } from "@/app/hooks/color-extractor";
-import { useState, useEffect, useRef } from "react";
-import { type GameMessage as GameMessageType } from "@/lib/types";
+'use client';
+import { useEffect, useRef, useState } from 'react';
+import { GameMessage } from './componentes/game-message';
+import { PwaControls } from './componentes/pwa-controls';
+import { VoiceControls } from './componentes/voice-controls';
+import { useColorExtractor } from './hooks/color-extractor';
+import { useGame } from './hooks/use-game';
+import { useNarration } from './hooks/use-narration';
 
 export default function Home() {
-  const { messages, input, isLoading, startGame, handleSubmit, handleInputChange } = useZombieGame();
-  const [image, setImage] = useState<string | undefined>('');
-  const lastMessageRef = useRef<GameMessageType | null>(null);
-  useColorExtractor(image);
-
+  const game = useGame();
+  const narration = useNarration(
+    game.messages,
+    game.hydrated,
+    game.config?.voiceEnabled,
+  );
+  const scrollArea = useRef<HTMLDivElement>(null);
+  const follow = useRef(true);
+  const [showScroll, setShowScroll] = useState(false);
+  const lastImage = [...game.messages]
+    .reverse()
+    .find((message) => message.image)?.image;
+  useColorExtractor(lastImage);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: New content changes scrollHeight even though the DOM ref is stable.
   useEffect(() => {
-    if (messages.length > 0) {
-      const latestMessage = messages[messages.length - 1];
-      
-      if (latestMessage !== lastMessageRef.current && 
-          latestMessage.image?.base64Data && 
-          !latestMessage.imageLoading) {
-        
-        setImage(latestMessage.image.base64Data);
-        lastMessageRef.current = latestMessage;
-      }
-    }
-  }, [messages]);
-
-  useEffect(() => {
-    if (messages.length > 0 && !image) {
-      const firstMessage = messages[0];
-      if (firstMessage.image && !firstMessage.imageLoading) {
-        setImage(firstMessage.image.base64Data);
-      }
-    }
-  }, [messages, image]);
-
-
+    if (follow.current && scrollArea.current)
+      scrollArea.current.scrollTop = scrollArea.current.scrollHeight;
+  }, [game.messages, game.isLoading]);
   return (
-    <div className="font-sans h-screen mx-auto overflow-hidden bg-gradient-to-t from-[var(--color-gradient-principal)] to-[var(--color-gradient-secondary)]">
-      
-      <div className="flex flex-col h-full">
-        <Conversation>
-          <ConversationContent className="max-w-xl mx-auto">
-            {
-              messages.map(message => (
-                <GameMessage key={message.id} message={message} />
-              ))
+    <main className="adventure">
+      <header className="game-header">
+        <div>
+          <p className="eyebrow">UNA HISTORIA QUE DECIDES TÚ</p>
+          <h1>Calabozos y Dragones</h1>
+        </div>
+        <button
+          className="secondary-button"
+          type="button"
+          disabled={!game.config?.configured}
+          onClick={() => {
+            if (
+              !game.messages.length ||
+              window.confirm(
+                '¿Empezar una nueva aventura? La conversación actual se sustituirá.',
+              )
+            ) {
+              narration.stop();
+              game.newGame();
             }
-            {isLoading && <GameLoader />}
-          </ConversationContent>
-          <ConversationScrollButton />
-        </Conversation>
-
-        <div className="max-w-2xl w-full mx-auto pb-4">
-          <GameInput
-            input={input}
-            onInputChange={handleInputChange}
-            onSubmit={handleSubmit}
-            isLoading={isLoading}
-          />
+          }}
+        >
+          Nueva aventura
+        </button>
+      </header>
+      <div className="game-toolbar">
+        <PwaControls />
+        <label className="image-toggle">
+          <input
+            type="checkbox"
+            checked={game.imagesEnabled && game.imagesAvailable}
+            disabled={!game.imagesAvailable}
+            onChange={(event) => game.toggleImages(event.target.checked)}
+          />{' '}
+          Ilustraciones según la escena
+        </label>
+      </div>
+      <VoiceControls
+        narration={narration}
+        cloudAvailable={game.config?.voiceEnabled === true}
+      />
+      {!game.online && (
+        <p className="offline-notice" role="status">
+          Sin conexión · Puedes leer tu partida guardada.
+        </p>
+      )}
+      <div
+        className="conversation"
+        ref={scrollArea}
+        onScroll={() => {
+          const element = scrollArea.current;
+          if (!element) return;
+          follow.current =
+            element.scrollHeight - element.scrollTop - element.clientHeight <
+            120;
+          setShowScroll(!follow.current);
+        }}
+      >
+        <div className="conversation-inner">
+          {(!game.hydrated || !game.config) && (
+            <p role="status" className="empty-state">
+              Preparando tu aventura…
+            </p>
+          )}
+          {game.config && !game.config.configured && (
+            <div role="alert" className="notice">
+              <h2>Prepara al narrador</h2>
+              <p>{game.config.message}</p>
+            </div>
+          )}
+          {game.storageWarning && (
+            <p className="storage-warning" role="status">
+              {game.storageWarning}
+            </p>
+          )}
+          {game.messages.map((message) => (
+            <GameMessage
+              key={message.id}
+              message={message}
+              imagesEnabled={game.imagesEnabled && game.imagesAvailable}
+              onRetryImage={(id, prompt) => {
+                void game.generateImage(id, prompt);
+              }}
+              onListen={(message) => {
+                void narration.listen(message);
+              }}
+            />
+          ))}
+          {game.isLoading && (
+            <p className="story-loading" role="status">
+              <span className="loading-dot" /> El narrador prepara la siguiente
+              escena…
+            </p>
+          )}
+          {game.error && (
+            <div className="notice" role="alert">
+              <p>{game.error}</p>
+              <div className="error-actions">
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={game.retry}
+                  disabled={game.isLoading}
+                >
+                  Reintentar escena
+                </button>
+                {game.canEdit && (
+                  <button
+                    type="button"
+                    className="text-button"
+                    onClick={game.editAction}
+                  >
+                    Cambiar acción
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
-    </div>
+      {showScroll && (
+        <button
+          type="button"
+          className="scroll-button"
+          onClick={() => {
+            if (scrollArea.current)
+              scrollArea.current.scrollTop = scrollArea.current.scrollHeight;
+          }}
+        >
+          Ir al último mensaje ↓
+        </button>
+      )}
+      <footer className="game-footer">
+        <form
+          onSubmit={(event) => {
+            narration.stop();
+            game.submit(event);
+          }}
+          className="action-form"
+        >
+          <label htmlFor="action" className="action-label">
+            Tu próxima acción
+          </label>
+          <div className="action-row">
+            <textarea
+              id="action"
+              value={game.input}
+              maxLength={2000}
+              rows={2}
+              placeholder="¿Qué haces? Explora, pregunta o toma una decisión…"
+              disabled={
+                game.isLoading ||
+                Boolean(game.error) ||
+                !game.config?.configured ||
+                !game.online
+              }
+              onChange={(event) => game.setInput(event.target.value)}
+              onKeyDown={(event) => {
+                if (
+                  event.key === 'Enter' &&
+                  !event.shiftKey &&
+                  !event.nativeEvent.isComposing
+                ) {
+                  event.preventDefault();
+                  event.currentTarget.form?.requestSubmit();
+                }
+              }}
+            />
+            <button
+              className="send-button"
+              type="submit"
+              aria-label="Enviar acción"
+              disabled={
+                game.isLoading ||
+                Boolean(game.error) ||
+                !game.input.trim() ||
+                !game.config?.configured ||
+                !game.online
+              }
+            >
+              Enviar <span aria-hidden="true">↗</span>
+            </button>
+          </div>
+        </form>
+        <p className="footer-note">
+          Partida guardada en este navegador · Las ilustraciones no se guardan ·
+          La IA puede equivocarse
+        </p>
+      </footer>
+    </main>
   );
 }
