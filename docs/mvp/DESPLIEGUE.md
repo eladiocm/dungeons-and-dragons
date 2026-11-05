@@ -26,3 +26,14 @@ Para una prueba privada en red, un túnel HTTPS al servidor Node es una opción,
 Conservar `.data/game.sqlite`, WAL/SHM si se copia en caliente (se recomienda detener proceso) y `.data/save-key`. No subir a Git ni a artefactos públicos. Importar una descarga requiere la misma clave. Perder cookie y clave elimina las vías normales de acceso/recuperación; planear el respaldo antes de cambiar de equipo.
 
 La instalación PWA solo instala la interfaz. IA y autoridad de partida siguen necesitando backend/red. Offline es lectura y borrador, no juego autónomo.
+
+## Elección de alojamiento — revisión del 5 de noviembre de 2026
+
+El usuario solicita integrar esta demo en main y desplegar, consultando antes el alojamiento. La autorización de integración sustituye la restricción anterior de mantener main separada; la elección de plataforma sigue pendiente y no autoriza una suscripción de pago por sí sola.
+
+- **Render Starter + disco persistente**: recomendación para publicar la arquitectura actual sin cambiar el repositorio SQLite. Precio de referencia: 7 USD/mes de cómputo + 0,25 USD/mes por 1 GB de disco; impuestos, ancho de banda y otros consumos pueden sumar. Render Free no ofrece disco persistente.
+- **Cloudflare Workers + persistencia gestionada (D1 o SQLite de Durable Objects según el adaptador)**: alternativa para priorizar las cuotas gratuitas y la cuenta ya conectada. Necesita adaptar repositorio/transacciones/trabajos/medios/clave de guardados y probar el runtime del framework; no es desplegar el código Node actual sin cambios ni se garantiza que todo entre en límites gratuitos sin medirlo.
+- **Railway**: volúmenes persistentes y plan Hobby desde 5 USD/mes de uso mínimo, con posibles extras. Su plan gratuito tiene crédito de consumo reducido; no debe describirse como servidor permanente ilimitado.
+- **Vercel**: la versión con SQLite local necesita sustituir el almacenamiento; no ofrece el archivo persistente compartido requerido por este repositorio.
+
+Fuentes oficiales consultadas: [Render precios](https://render.com/pricing), [Render discos](https://render.com/docs/disks), [Railway precios](https://railway.com/pricing), [D1 cuotas](https://developers.cloudflare.com/d1/platform/pricing/), [Workers límites](https://developers.cloudflare.com/workers/platform/limits/), [SQLite en Vercel](https://vercel.com/kb/guide/is-sqlite-supported-in-vercel). No se ha contratado alojamiento ni publicado esta demo por esta comparación.

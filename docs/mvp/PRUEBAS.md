@@ -82,3 +82,7 @@ Navegador de pruebas: Brave/Chromium firmado, controlado por Playwright; se usa 
 ## Ajuste posterior — navegación del creador
 
 5 de noviembre de 2026: al cambiar de paso se restablece el scroll al inicio y el foco al título. Regresión reproducida antes del arreglo en 390/1280 px (scroll 1167/508 px tras avanzar). Después: cinco E2E del creador/campaña correctas, incluidas dos nuevas pruebas de avance, revisión y vuelta; tipos, lint y build correctos. La suite total contiene ahora 26 pruebas; en este ajuste se ejecutó el archivo afectado con 5, no se repitió la suite completa. Editar elecciones dentro del mismo paso no reinicia la lectura.
+
+## Validación para integración de la demo
+
+5 de noviembre de 2026, tras la petición de integrar y desplegar: 133/133 unitarias y 27/27 E2E completas, tipos/lint/build correctos. La primera ejecución de 26 pruebas detectó un evento timeupdate tardío que movía el resaltado después de pausar. Una regresión determinista lo reprodujo (palabra 0→28 mientras estaba pausado); el controlador ahora ignora progreso con audio.paused. La nueva prueba también verifica que el progreso vuelve a funcionar al reanudar. No se ocultó la falla mediante reintentos.

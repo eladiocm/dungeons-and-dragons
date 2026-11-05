@@ -307,7 +307,8 @@ export function useNarration(
       audio.volume = volume;
       let index = 0;
       const progress = () => {
-        if (run !== generation.current) return;
+        // Browsers can dispatch a final queued timeupdate after pause().
+        if (run !== generation.current || audio.paused) return;
         const chunk = chunks[index],
           word = wordAtTime(chunk.text, audio.currentTime, audio.duration);
         setActiveWord(word < 0 ? -1 : chunk.firstWord + word);

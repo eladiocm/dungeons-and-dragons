@@ -386,3 +386,67 @@ test('speech quota failure leaves text intact and does not retry automatically',
   );
   expect(calls).toBe(1);
 });
+
+test('a queued audio progress event cannot move the highlighted word while paused', async ({
+  page,
+}) => {
+  await voice(page);
+  await page.addInitScript(() => {
+    const w = window as unknown as {
+      Audio: unknown;
+      narrationAudio: { flushProgress: () => void };
+    };
+    w.Audio = class {
+      src = '';
+      preload = 'none';
+      paused = true;
+      duration = 2;
+      currentTime = 0;
+      volume = 1;
+      playbackRate = 1;
+      onended: unknown;
+      onloadedmetadata: unknown;
+      onerror: unknown;
+      ontimeupdate?: () => void;
+      constructor() {
+        w.narrationAudio = this;
+      }
+      play() {
+        this.paused = false;
+        return Promise.resolve();
+      }
+      pause() {
+        this.paused = true;
+      }
+      flushProgress() {
+        this.currentTime = 1;
+        this.ontimeupdate?.();
+      }
+    };
+  });
+  await create(page);
+  await page.getByRole('button', { name: 'Pausar narración' }).click();
+  await expect(page.locator('.spoken-word.active')).toHaveAttribute(
+    'data-word',
+    '0',
+  );
+  await page.evaluate(() =>
+    (
+      window as unknown as { narrationAudio: { flushProgress: () => void } }
+    ).narrationAudio.flushProgress(),
+  );
+  await expect(page.locator('.spoken-word.active')).toHaveAttribute(
+    'data-word',
+    '0',
+  );
+  await page.getByRole('button', { name: 'Reproducir narración' }).click();
+  await page.evaluate(() =>
+    (
+      window as unknown as { narrationAudio: { flushProgress: () => void } }
+    ).narrationAudio.flushProgress(),
+  );
+  await expect(page.locator('.spoken-word.active')).not.toHaveAttribute(
+    'data-word',
+    '0',
+  );
+});
