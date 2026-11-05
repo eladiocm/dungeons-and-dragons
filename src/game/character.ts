@@ -101,6 +101,7 @@ export function suggestCharacter(classId: ClassId): CharacterDraft {
     name: 'Aren',
     classId,
     speciesId: 'human',
+    humanSize: 'medium',
     backgroundId: build.background,
     baseAbilities: { ...build.scores },
     boosts: { ...build.boosts },
@@ -561,7 +562,12 @@ export function createCharacter(input: unknown, id: string): CharacterState {
       abilities.str < (ARMOR[armor.catalogId].strength || 0)
         ? 6
         : 9,
-    size: speciesId === 'halfling' ? 'small' : 'medium',
+    size:
+      speciesId === 'halfling'
+        ? 'small'
+        : speciesId === 'human'
+          ? select(input.humanSize, { small: 1, medium: 1 }, 'el tamaño humano')
+          : 'medium',
     initiative: modifier(abilities.dex) + (features.includes('alert') ? 2 : 0),
     inspiration: speciesId === 'human',
     hitDie: cls.hitDie,

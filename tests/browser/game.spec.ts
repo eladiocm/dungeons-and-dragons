@@ -1,186 +1,170 @@
-import { expect, type Page, test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
+import { action, create, image, quiet } from './helpers';
 
-async function configure(page: Page) {
-  await page.route('**/api/config', (route) =>
-    route.fulfill({
-      json: {
-        provider: 'Prueba simulada',
-        configured: true,
-        imagesEnabled: true,
-      },
-    }),
-  );
-}
-const image = {
-  base64Data:
-    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aK9sAAAAASUVORK5CYII=',
-  mediaType: 'image/png',
-};
-
-test('one initial scene, turn sends text only, reload restores without AI calls', async ({
+test('loading does not start a game and reloading a private game does not call AI again', async ({
   page,
 }) => {
-  await configure(page);
+  await quiet(page);
   let calls = 0;
-  await page.route('**/api/generate-story', async (route) => {
-    calls++;
-    const body = route.request().postDataJSON();
-    if (!body.isStart) {
-      expect(body.userMessage).toBe('Abro la puerta');
-      expect(JSON.stringify(body.conversationHistory)).not.toContain('base64');
-      expect(body.conversationHistory[0]).toEqual({
-        role: 'assistant',
-        content: 'Hay una puerta. ¿Qué haces?',
-      });
-    }
-    await route.fulfill({
-      json: {
-        narrative:
-          calls === 1
-            ? 'Hay una puerta. ¿Qué haces?'
-            : 'La puerta se abre. ¿Entras?',
-        imagePrompt: 'castle door',
-      },
-    });
+  page.on('request', (r) => {
+    if (r.url().endsWith('/narrative') || r.url().endsWith('/intent')) calls++;
   });
-  await page.route('**/api/generate-image', (route) =>
-    route.fulfill({ json: { image } }),
-  );
   await page.goto('/');
-  await expect(page.getByText('Hay una puerta. ¿Qué haces?')).toBeVisible();
-  await expect(page.getByRole('img', { name: 'castle door' })).toBeVisible();
-  expect(calls).toBe(1);
-  await page
-    .getByRole('textbox', { name: 'Tu próxima acción' })
-    .fill('Abro la puerta');
-  await page.getByRole('button', { name: 'Enviar acción' }).click();
-  await expect(page.getByText('La puerta se abre. ¿Entras?')).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Crear personaje' }),
+  ).toBeVisible();
+  expect(calls).toBe(0);
+  await create(page);
+  const before = calls;
   await page.reload();
-  await expect(page.getByText('La puerta se abre. ¿Entras?')).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'El refugio de Valdumbría' }),
+  ).toBeVisible();
+  expect(calls).toBe(before);
+});
+test('lost response retries the same command without duplicated action and clears only the submitted draft', async ({
+  page,
+}) => {
+  await quiet(page);
+  await create(page);
+  let requests = 0;
+  const ids: string[] = [];
+  await page.route('**/intent', async (route) => {
+    requests++;
+    ids.push(route.request().postDataJSON().id);
+    if (requests === 1) {
+      await route.fetch();
+      await route.abort('failed');
+    } else await route.continue();
+  });
+  await action(page, 'Voy al camino');
+  await expect(
+    page.getByRole('button', { name: 'Reintentar la misma acción' }),
+  ).toBeVisible();
+  await expect(page.getByLabel('Tu acción')).toHaveValue('Voy al camino');
+  await page
+    .getByRole('button', { name: 'Reintentar la misma acción' })
+    .click();
+  await expect(
+    page.getByRole('heading', { name: 'El camino anegado' }),
+  ).toBeVisible();
+  await expect(page.getByLabel('Tu acción')).toHaveValue('');
+  expect(ids[0]).toBe(ids[1]);
+  await expect(page.locator('.chat-message.user')).toHaveCount(1);
+});
+test('illustration failure leaves scene playable and retry reloads from persistent image cache', async ({
+  page,
+}) => {
+  await quiet(page, true);
+  let calls = 0;
+  await page.route('**/image', (route) => {
+    calls++;
+    return route.fulfill(
+      calls === 1
+        ? { status: 502, json: { error: 'Imagen temporalmente no disponible' } }
+        : { json: { image } },
+    );
+  });
+  await create(page);
+  await expect(
+    page.getByRole('button', { name: 'Reintentar ilustración' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('img', { name: /Ilustración de/ }),
+  ).toHaveAttribute('src', '/scenes/square.svg');
+  await page.getByRole('button', { name: 'Reintentar ilustración' }).click();
+  await expect(
+    page.getByRole('img', { name: /Ilustración de/ }),
+  ).toHaveAttribute('src', /^data:/);
+  await action(page, 'Examino el mapa');
+  expect(calls).toBe(2);
+  await page.reload();
+  await expect(
+    page.getByRole('img', { name: /Ilustración de/ }),
+  ).toHaveAttribute('src', /^data:/);
   expect(calls).toBe(2);
 });
-
-test('failed story retries once without duplicated user message', async ({
+test('new game preserves the previous save and old illustrations cannot enter the creator', async ({
   page,
 }) => {
-  await configure(page);
-  let calls = 0;
-  await page.route('**/api/generate-story', (route) => {
-    calls++;
-    return calls === 2
-      ? route.fulfill({
-          status: 429,
-          json: { error: 'Cuota gratuita agotada' },
-        })
-      : route.fulfill({
-          json: {
-            narrative:
-              calls === 1 ? 'Un bosque. ¿Qué haces?' : 'Encuentras un sendero.',
-            imagePrompt: 'forest',
-          },
-        });
-  });
-  await page.route('**/api/generate-image', (route) =>
-    route.fulfill({ json: { image } }),
-  );
-  await page.goto('/');
-  await expect(page.getByText('Un bosque. ¿Qué haces?')).toBeVisible();
+  await quiet(page);
+  await create(page);
+  await page.getByLabel('Menú de partida').click();
   await page
-    .getByRole('textbox', { name: 'Tu próxima acción' })
-    .fill('Busco un sendero');
-  await page.getByRole('button', { name: 'Enviar acción' }).click();
-  await expect(page.getByRole('main').getByRole('alert')).toContainText(
-    'Cuota gratuita agotada',
-  );
-  await page.getByRole('button', { name: 'Reintentar escena' }).click();
-  await expect(page.getByText('Encuentras un sendero.')).toBeVisible();
-  await expect(page.getByText('Busco un sendero', { exact: true })).toHaveCount(
-    1,
-  );
+    .getByRole('button', { name: 'Nueva partida', exact: true })
+    .click();
+  await page.getByRole('button', { name: 'Crear otra partida' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Da forma a tu aventurero' }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Cancelar', exact: true }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Continúa tu historia' }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: /Aren La última luz/ }).click();
+  await expect(
+    page.getByRole('heading', { name: 'El refugio de Valdumbría' }),
+  ).toBeVisible();
 });
-
-test('image failure does not block story and retries independently', async ({
+test('unavailable Master keeps draft and resources and has no request storm', async ({
   page,
 }) => {
-  await configure(page);
-  let stories = 0;
-  let images = 0;
-  await page.route('**/api/generate-story', (route) => {
-    stories++;
+  await quiet(page);
+  await create(page);
+  let calls = 0;
+  await page.route('**/intent', (route) => {
+    calls++;
     return route.fulfill({
-      json: { narrative: 'Una torre. ¿Subes?', imagePrompt: 'tower' },
+      status: 429,
+      json: { error: 'Cuota agotada. Reintenta después.' },
     });
   });
-  await page.route('**/api/generate-image', (route) => {
-    images++;
-    return images === 1
-      ? route.fulfill({ status: 503, json: { error: 'Imagen no disponible' } })
-      : route.fulfill({ json: { image } });
-  });
-  await page.goto('/');
-  await expect(page.getByText('Una torre. ¿Subes?')).toBeVisible();
-  await page.getByRole('button', { name: 'Reintentar imagen' }).click();
-  await expect(page.getByRole('img', { name: 'tower' })).toBeVisible();
-  expect(stories).toBe(1);
-  expect(images).toBe(2);
-});
-
-test('reset cancels old scene and mobile layout fits viewport', async ({
-  page,
-}) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await configure(page);
-  let calls = 0;
-  await page.route('**/api/generate-story', async (route) => {
-    calls++;
-    const first = calls === 1;
-    if (first) await new Promise((resolve) => setTimeout(resolve, 500));
-    await route
-      .fulfill({
-        json: {
-          narrative: first ? 'Escena antigua' : 'Escena nueva',
-          imagePrompt: 'forest',
-        },
-      })
-      .catch(() => {});
-  });
-  await page.route('**/api/generate-image', (route) =>
-    route.fulfill({ json: { image } }),
-  );
-  await page.goto('/');
-  await expect.poll(() => calls).toBe(1);
-  page.once('dialog', (dialog) => dialog.accept());
-  await page.getByRole('button', { name: 'Nueva aventura' }).click();
-  await expect(page.getByText('Escena nueva')).toBeVisible();
-  await expect(page.getByText('Escena antigua')).toHaveCount(0);
-  expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= window.innerWidth,
-    ),
-  ).toBeTruthy();
-});
-
-test('missing credentials shows configuration error without a request storm', async ({
-  page,
-}) => {
-  await page.route('**/api/config', (route) =>
-    route.fulfill({
-      json: {
-        provider: 'Cloudflare',
-        configured: false,
-        imagesEnabled: false,
-        message: 'Falta configurar CLOUDFLARE_API_TOKEN',
-      },
-    }),
-  );
-  let stories = 0;
-  await page.route('**/api/generate-story', (route) => {
-    stories++;
-    return route.abort();
-  });
-  await page.goto('/');
+  await action(page, 'Examino el mapa');
   await expect(page.getByRole('main').getByRole('alert')).toContainText(
-    'CLOUDFLARE_API_TOKEN',
+    'Cuota agotada',
   );
-  expect(stories).toBe(0);
+  await expect(page.getByLabel('Tu acción')).toHaveValue('Examino el mapa');
+  expect(calls).toBe(1);
+  await expect(page.locator('.health strong')).toContainText('12');
+});
+test('legacy adventure stays readable and a cached new game is read only offline', async ({
+  page,
+  context,
+}) => {
+  await quiet(page);
+  await page.addInitScript(() =>
+    localStorage.setItem(
+      'dnd-adventure-v1',
+      JSON.stringify({
+        version: 1,
+        imagesEnabled: false,
+        messages: [
+          {
+            id: 'old',
+            role: 'assistant',
+            content: 'Tu antiguo viaje junto al roble.',
+          },
+        ],
+      }),
+    ),
+  );
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Leer tu aventura anterior' }).click();
+  await expect(page.locator('.legacy-story')).toContainText(
+    'Tu antiguo viaje junto al roble.',
+  );
+  await create(page);
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.ready;
+  });
+  await context.setOffline(true);
+  await page.reload();
+  await expect(
+    page.getByRole('heading', { name: 'El refugio de Valdumbría' }),
+  ).toBeVisible();
+  await expect(page.getByText('Sin conexión', { exact: true })).toBeVisible();
+  await page.getByLabel('Tu acción').fill('Espero');
+  await expect(
+    page.getByRole('button', { name: 'Enviar acción' }),
+  ).toBeDisabled();
 });

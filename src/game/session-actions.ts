@@ -179,6 +179,7 @@ function attachCarriedObjects(
       quantity: 1,
       conditions: [],
     };
+    item.equipped = false;
     hero.inventory.push(single);
     item = single;
   }

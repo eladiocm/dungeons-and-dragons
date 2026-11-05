@@ -647,3 +647,29 @@ test('carried spell effects expire with world time and cannot return from stale 
     ),
   );
 });
+
+test('lighting one equipped item in a stack transfers equipment to that single object', () => {
+  let state = startSession(
+    'mage',
+    'person',
+    createCharacter(suggestCharacter('wizard'), 'hero'),
+  );
+  const hero = state.battle.actors.hero;
+  assert.ok('inventory' in hero);
+  const daggers = hero.inventory.find((i) => i.catalogId === 'dagger');
+  assert.ok(daggers);
+  daggers.equipped = true;
+  state = act(state, {
+    kind: 'cast',
+    spellId: 'light',
+    targetIds: [],
+    options: { objectId: daggers.id },
+  });
+  const after = state.battle.actors.hero;
+  assert.ok('inventory' in after);
+  const stacks = after.inventory.filter((i) => i.catalogId === 'dagger');
+  assert.equal(stacks.filter((i) => i.equipped).length, 1);
+  assert.ok(
+    stacks.find((i) => i.equipped)?.conditions?.some((c) => c.id === 'light'),
+  );
+});

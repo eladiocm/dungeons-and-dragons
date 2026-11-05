@@ -2,6 +2,16 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createCharacter, suggestCharacter } from '../src/game/character.ts';
 
+test('human chooses small or medium size while other species retain their actual size', () => {
+  const draft = { ...suggestCharacter('fighter'), humanSize: 'small' };
+  assert.equal(createCharacter(draft, 'hero').size, 'small');
+  assert.throws(() => createCharacter({ ...draft, humanSize: 'huge' }, 'hero'));
+  assert.equal(
+    createCharacter({ ...draft, speciesId: 'dwarf' }, 'hero').size,
+    'medium',
+  );
+});
+
 test('fighter starts with legal level one defenses and both background and class equipment', () => {
   const hero = createCharacter(suggestCharacter('fighter'), 'hero');
   assert.equal(hero.hp.max, 12);

@@ -1,6 +1,9 @@
-import { handleSpeech } from '@/lib/game-api';
-export const runtime = 'nodejs';
-export const maxDuration = 65;
-export function POST(request: Request) {
-  return handleSpeech(request);
+export function POST() {
+  return Response.json(
+    {
+      error:
+        'Esta ruta pertenece a la versión anterior. Actualiza la aplicación y continúa desde tu partida.',
+    },
+    { status: 410, headers: { 'Cache-Control': 'no-store' } },
+  );
 }

@@ -55,6 +55,7 @@ export interface CharacterDraft {
   name: string;
   classId: ClassId;
   speciesId: SpeciesId;
+  humanSize: 'small' | 'medium';
   backgroundId: BackgroundId;
   baseAbilities: Scores;
   boosts: Partial<Scores>;

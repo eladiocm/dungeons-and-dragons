@@ -1,8 +1,14 @@
 /* The shell is public. API responses, voice, prompts and credentials are never cached. */
-const CACHE = 'dnd-shell-v3';
+const CACHE = 'dnd-shell-v4';
 const CORE = [
   '/',
   '/offline.html',
+  '/scenes/square.svg',
+  '/scenes/road.svg',
+  '/scenes/mill.svg',
+  '/scenes/chamber.svg',
+  '/scenes/beacon.svg',
+  '/scenes/beacon-lit.svg',
   '/manifest.webmanifest',
   '/icons/icon-192.png',
   '/icons/icon-512.png',

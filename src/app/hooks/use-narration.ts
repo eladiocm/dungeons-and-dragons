@@ -11,6 +11,7 @@ export function useNarration(
   messages: GameMessage[],
   hydrated: boolean,
   cloudAvailable: boolean | undefined,
+  sessionId?: string,
 ) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [voice, setVoice] = useState<Voice>('nestor');
@@ -156,16 +157,25 @@ export function useNarration(
         setStatus('loading');
         const created: string[] = [];
         try {
-          for (const text of splitSpeechText(message.content)) {
-            const response = await fetch('/api/narrate', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ text, speaker: voice }),
-              signal: AbortSignal.any([
-                currentController.signal,
-                AbortSignal.timeout(70000),
-              ]),
-            });
+          for (const [chunkIndex, text] of splitSpeechText(
+            message.content,
+          ).entries()) {
+            const response = await fetch(
+              sessionId ? `/api/sessions/${sessionId}/speech` : '/api/narrate',
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(
+                  sessionId
+                    ? { messageId: message.id, chunkIndex, speaker: voice }
+                    : { text, speaker: voice },
+                ),
+                signal: AbortSignal.any([
+                  currentController.signal,
+                  AbortSignal.timeout(70000),
+                ]),
+              },
+            );
             if (!response.ok) {
               const result: unknown = await response.json();
               throw new Error(
@@ -212,7 +222,7 @@ export function useNarration(
       setHasAudio(true);
       await playCurrent();
     },
-    [voice, stop, playCurrent],
+    [voice, stop, playCurrent, sessionId],
   );
 
   useEffect(() => {

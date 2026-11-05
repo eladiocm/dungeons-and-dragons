@@ -435,7 +435,7 @@ export function publicSession(input: GameSession): PublicSession {
     scene: {
       id: world.sceneId,
       ...scene,
-      fallback: `/scenes/${world.sceneId}.svg`,
+      fallback: `/scenes/${world.sceneId}${world.sceneId === 'beacon' && world.flags.beaconLit ? '-lit' : ''}.svg`,
       connections:
         world.sceneId === 'road' && world.flags.reedPath
           ? [...scene.connections, 'beacon']
