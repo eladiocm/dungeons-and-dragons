@@ -113,6 +113,15 @@ test('poison resistance halves damage downwards and zero effective damage is har
   assert.equal(applyDamage(dwarf, 1, 'poison').hp.current, 13);
 });
 
+test('damage immunity prevents damage and resistance is applied before vulnerability', () => {
+  const base = hero();
+  base.immunities.push('poison');
+  assert.equal(applyDamage(base, 50, 'poison').hp.current, 12);
+  base.resistances.push('fire');
+  base.vulnerabilities = ['fire'];
+  assert.equal(applyDamage(base, 5, 'fire').hp.current, 8);
+});
+
 test('massive damage and damage at zero use separate death rules', () => {
   const base = hero();
   assert.equal(applyDamage(base, 23, 'force').dead, false);

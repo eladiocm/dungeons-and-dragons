@@ -463,6 +463,7 @@ export const ITEMS: Record<
   string,
   { name: string; weight: number; quantity?: number }
 > = {
+  'component-pouch': { name: 'Bolsa de componentes', weight: 1 },
   shield: { name: 'Escudo', weight: 3 },
   arrows20: { name: 'Flecha', quantity: 20, weight: 0.025 },
   quiver: { name: 'Aljaba', weight: 0.5 },

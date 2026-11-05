@@ -145,6 +145,7 @@ export interface CharacterState {
   inventory: InventoryItem[];
   currency: number;
   resistances: DamageType[];
+  vulnerabilities?: DamageType[];
   immunities: string[];
   conditions: Condition[];
   deathSaves: { successes: number; failures: number; stable: boolean };
@@ -154,6 +155,39 @@ export interface CharacterState {
   xp: number;
 }
 export type Roller = (sides: number) => number;
+export type HealthState = Pick<
+  CharacterState,
+  | 'hp'
+  | 'resistances'
+  | 'vulnerabilities'
+  | 'immunities'
+  | 'conditions'
+  | 'deathSaves'
+  | 'dead'
+>;
+export interface NpcState extends HealthState {
+  kind: 'npc';
+  id: string;
+  name: string;
+  abilities: Scores;
+  ac: number;
+  speed: number;
+  size: 'small' | 'medium';
+  initiative: number;
+  features: string[];
+  immunities: string[];
+  saveBonuses: Partial<Scores>;
+  attacks: {
+    id: string;
+    name: string;
+    bonus: number;
+    dice: [number, number];
+    modifier: number;
+    type: DamageType;
+    range: number;
+  }[];
+}
+export type Combatant = CharacterState | NpcState;
 export class RuleError extends Error {
   status: number;
   constructor(message: string, status = 400) {

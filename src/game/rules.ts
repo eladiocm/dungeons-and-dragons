@@ -3,6 +3,7 @@ import { rollDice } from './dice.ts';
 import {
   type CharacterState,
   type DamageType,
+  type HealthState,
   type Roller,
   RuleError,
 } from './types.ts';
@@ -11,23 +12,33 @@ function amount(value: number): void {
   if (!Number.isInteger(value) || value < 0 || value > 10000)
     throw new RuleError('Cantidad no válida.');
 }
-function unconscious(hero: CharacterState): void {
+export function damageAmount(
+  actor: HealthState,
+  raw: number,
+  type: DamageType,
+): number {
+  amount(raw);
+  if (actor.immunities.includes(type)) return 0;
+  const resisted = actor.resistances.includes(type) ? Math.floor(raw / 2) : raw;
+  return actor.vulnerabilities?.includes(type) ? resisted * 2 : resisted;
+}
+function unconscious(hero: HealthState): void {
   if (
     !hero.conditions.some((c) => c.id === 'unconscious' && c.source === 'dying')
   )
     hero.conditions.push({ id: 'unconscious', source: 'dying' });
   hero.conditions = hero.conditions.filter((c) => c.id !== 'concentrating');
 }
-export function applyDamage(
-  input: CharacterState,
+export function applyDamage<T extends HealthState>(
+  input: T,
   raw: number,
   type: DamageType,
   critical = false,
-): CharacterState {
+): T {
   amount(raw);
   const hero = structuredClone(input);
   if (hero.dead) return hero;
-  const damage = hero.resistances.includes(type) ? Math.floor(raw / 2) : raw;
+  const damage = damageAmount(hero, raw, type);
   if (damage === 0) return hero;
   const absorbed = Math.min(hero.hp.temp, damage);
   hero.hp.temp -= absorbed;
@@ -48,7 +59,7 @@ export function applyDamage(
   hero.conditions = hero.conditions.filter((c) => c.source !== 'sleep');
   return hero;
 }
-export function heal(input: CharacterState, value: number): CharacterState {
+export function heal<T extends HealthState>(input: T, value: number): T {
   amount(value);
   const hero = structuredClone(input);
   if (hero.dead || value === 0) return hero;
@@ -59,10 +70,7 @@ export function heal(input: CharacterState, value: number): CharacterState {
   }
   return hero;
 }
-export function gainTempHp(
-  input: CharacterState,
-  value: number,
-): CharacterState {
+export function gainTempHp<T extends HealthState>(input: T, value: number): T {
   amount(value);
   const hero = structuredClone(input);
   hero.hp.temp = Math.max(hero.hp.temp, value);
