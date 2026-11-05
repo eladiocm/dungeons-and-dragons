@@ -1,5 +1,11 @@
 # Calabozos y Dragones — aventura con IA gratuita
 
+## Evolución al MVP SRD
+
+El desarrollo continúa en `develop`. La versión ejecutable 0.3.0 sigue siendo una aventura narrativa; la creación de personaje, el motor SRD, combate y dados están **en diseño, todavía sin implementar**. El alcance elegido es SRD 5.2.1 español, nivel 1 y guerrero, pícaro, clérigo y mago. Primero aventura preparada con acciones libres; mundo abierto en una segunda etapa.
+
+Consulta [la especificación y documentación del MVP](docs/mvp/README.md), [el estado real](docs/mvp/ESTADO.md) y [la guía para agentes](AGENTS.md). El diseño incluye voz, dictado con revisión, mesa adaptable, persistencia y criterios de pruebas. Las propuestas de catálogo y límites de sincronización/dictado esperan revisión del usuario.
+
 Aventura conversacional en español: eliges acciones, un narrador de IA desarrolla la historia y un segundo modelo ilustra las escenas con estética pixel art. Es un juego narrativo inspirado en D&D; no implementa fichas, dados ni reglas oficiales.
 
 ## Opción recomendada: Cloudflare Workers AI
