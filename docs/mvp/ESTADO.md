@@ -41,3 +41,5 @@ Tareas 1 a 4: creación y catálogo; dados, daño, muerte y descansos; armas/con
 Verificación actual: 97 pruebas unitarias correctas, tipos y lint. La interfaz y servidor siguen en la base 0.3.0 hasta conectar las tareas siguientes. Pendientes: persistencia HTTP/SQLite, Master, creador y mesa visual, controles nuevos de voz/dictado y E2E de producto.
 
 Tarea 5: repositorio SQLite, sesión privada por cookie, control de versiones y comandos idempotentes implementados. Exportación cifrada/importación privada ligada a la clave de instalación. Las rutas nuevas todavía no están conectadas a la mesa. Las siguientes tareas son Master y medios autorizados, creador y mesa, voz/dictado, verificación de producto.
+
+Tarea 6: Master separado en interpretación/prosa, arrendamientos persistidos para reintentos, contexto acotado y operaciones validadas. Rutas de imagen/voz por IDs autorizados; transcripción WAV de hasta45s solo devuelve borrador.115 unitarias correctas, tipos/lint/build. Comprobación real: examinar mapa devuelve interact/inspect válido tras precisar kind del plan en el prompt. UI nueva todavía pendiente.

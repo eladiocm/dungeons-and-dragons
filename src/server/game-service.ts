@@ -2,7 +2,9 @@ import { createHash, randomInt, randomUUID } from 'node:crypto';
 import { createCharacter } from '../game/character.ts';
 import { publicSession, startSession, transition } from '../game/engine.ts';
 import type { GameCommand } from '../game/session-types.ts';
+import { getHero } from '../game/session-utils.ts';
 import { type Roller, RuleError } from '../game/types.ts';
+import type { Master } from './master.ts';
 import type { SaveCodec } from './save-codec.ts';
 import type { SessionStore } from './session-store.ts';
 
@@ -12,14 +14,17 @@ export class GameService {
   readonly store: SessionStore;
   private readonly roller: Roller;
   private readonly codec?: SaveCodec;
+  private readonly master?: Master;
   constructor(
     store: SessionStore,
     roller: Roller = (sides) => randomInt(1, sides + 1),
     codec?: SaveCodec,
+    master?: Master,
   ) {
     this.store = store;
     this.roller = roller;
     this.codec = codec;
+    this.master = master;
   }
   list(owner: string) {
     return this.store.list(owner);
@@ -71,6 +76,112 @@ export class GameService {
     if (!this.codec)
       throw new RuleError('Las copias no están configuradas.', 503);
     return this.codec.seal(this.store.read(owner, id));
+  }
+  async intent(
+    owner: string,
+    id: string,
+    expectedVersion: number,
+    input: { id: string; actorId: string; text: string },
+  ) {
+    const hash = hashPayload({ expectedVersion, input }),
+      replay = this.store.replay(owner, id, input.id, hash);
+    if (replay) return { session: publicSession(replay), replayed: true };
+    const state = this.store.read(owner, id);
+    getHero(state, input.actorId);
+    if (state.version !== expectedVersion)
+      throw new RuleError(
+        'La partida cambió. Actualiza y revisa tu acción.',
+        409,
+      );
+    if (state.pending || state.status === 'ended')
+      throw new RuleError(
+        'Resuelve primero la acción pendiente o crea otra aventura.',
+      );
+    if (!this.master)
+      throw new RuleError('El Master no está configurado.', 503);
+    const key = `intent:${input.id}`,
+      job = this.store.claim(owner, id, key, hash);
+    if (job.cached)
+      return {
+        session: this.get(owner, id),
+        replayed: true,
+        clarification: JSON.parse(job.cached).clarification as
+          | string
+          | undefined,
+      };
+    try {
+      const proposal = await this.master.interpret(
+        state,
+        input.actorId,
+        input.text,
+      );
+      if (proposal.kind === 'clarify') {
+        this.store.finishJob(
+          id,
+          key,
+          JSON.stringify({ clarification: proposal.question }),
+        );
+        return {
+          session: this.get(owner, id),
+          replayed: false,
+          clarification: proposal.question,
+        };
+      }
+      const result = this.store.transact(
+        owner,
+        id,
+        expectedVersion,
+        input.id,
+        hash,
+        (s) =>
+          transition(
+            s,
+            { ...input, type: 'propose', plan: proposal.plan },
+            this.roller,
+          ),
+      );
+      this.store.finishJob(id, key, '{}');
+      return {
+        session: publicSession(result.state),
+        replayed: result.replayed,
+      };
+    } catch (error) {
+      this.store.releaseJob(id, key);
+      throw error;
+    }
+  }
+  async narrate(
+    owner: string,
+    id: string,
+    messageId: string,
+  ): Promise<{ session: ReturnType<typeof publicSession>; warning?: string }> {
+    const state = this.store.read(owner, id),
+      message = state.messages.find(
+        (m) => m.id === messageId && m.role === 'assistant',
+      );
+    if (!message) throw new RuleError('No se encontró esa intervención.', 404);
+    if (!message.narrationPending) return { session: publicSession(state) };
+    if (!this.master)
+      return {
+        session: publicSession(state),
+        warning:
+          'La narración está pendiente. Los resultados ya están guardados.',
+      };
+    const key = `narration:${messageId}`;
+    this.store.claim(owner, id, key, hashPayload(messageId));
+    try {
+      const content = await this.master.narrate(state, message),
+        next = this.store.amendNarration(owner, id, messageId, content);
+      this.store.finishJob(id, key, '{}');
+      return { session: publicSession(next) };
+    } catch {
+      this.store.releaseJob(id, key);
+      return {
+        session: this.get(owner, id),
+        warning:
+          'No se pudo ampliar la narración. Los hechos y resultados se han conservado; puedes reintentar.',
+      };
+    }
   }
   import(owner: string, creationId: string, save: unknown) {
     if (!this.codec)

@@ -10,6 +10,30 @@ import {
   validateStoryRequest,
 } from '../src/lib/game-contract.ts';
 
+test('Master JSON request sends trusted system separately and validates provider output', async () => {
+  const provider = createProvider(
+    { provider: 'cloudflare', accountId: 'a'.repeat(32), token: 'secret' },
+    async (_url, init) => {
+      const body = JSON.parse(String(init?.body));
+      assert.equal(body.messages[0].role, 'system');
+      assert.equal(body.messages[0].content, 'interpret');
+      assert.equal(body.messages[1].content, '{"text":"dato"}');
+      assert.equal(body.response_format.type, 'json_object');
+      return Response.json({
+        success: true,
+        result: {
+          response:
+            '{"kind":"action","plan":{"kind":"travel","destination":"road"}}',
+        },
+      });
+    },
+  );
+  assert.deepEqual(await provider.json('interpret', { text: 'dato' }), {
+    kind: 'action',
+    plan: { kind: 'travel', destination: 'road' },
+  });
+});
+
 test('history strips images and bounds context without dropping initial scene', () => {
   const history = Array.from({ length: 70 }, (_, i) => ({
     id: String(i),

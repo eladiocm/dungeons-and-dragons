@@ -17,6 +17,7 @@ export interface ProviderConfig {
   imagesEnabled?: boolean;
 }
 export interface AIProvider {
+  json(system: string, data: unknown, temperature?: number): Promise<unknown>;
   story(input: StoryRequest, signal?: AbortSignal): Promise<StoryResponse>;
   image(prompt: string, signal?: AbortSignal): Promise<GeneratedImage>;
 }
@@ -160,6 +161,62 @@ export function createProvider(
     return value.result;
   }
   return {
+    async json(system, data, temperature = 0.3) {
+      const messages = [
+        { role: 'system', content: system },
+        { role: 'user', content: JSON.stringify(data) },
+      ];
+      let raw: unknown;
+      if (config.provider === 'ollama') {
+        let url: URL;
+        try {
+          url = new URL(config.ollamaUrl || 'http://127.0.0.1:11434');
+        } catch {
+          throw new GameError('OLLAMA_BASE_URL no es válida.', 503);
+        }
+        if (
+          !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname) ||
+          !['http:', 'https:'].includes(url.protocol)
+        )
+          throw new GameError('Ollama debe estar en una dirección local.', 503);
+        const value = await post(fetcher, `${url.origin}/api/chat`, {
+          model: config.ollamaModel || 'qwen3:4b',
+          messages,
+          stream: false,
+          format: 'json',
+          think: false,
+          options: { temperature, num_predict: 1100 },
+        });
+        raw =
+          isRecord(value) && isRecord(value.message)
+            ? value.message.content
+            : undefined;
+      } else
+        raw = (
+          await cloudflare(TEXT_MODEL, {
+            messages,
+            max_tokens: 1100,
+            temperature,
+            response_format: { type: 'json_object' },
+          })
+        ).response;
+      if (isRecord(raw)) return raw;
+      if (typeof raw !== 'string' || raw.length > 12000)
+        throw new GameError(
+          'El Master devolvió un formato inválido. Puedes reintentar.',
+          502,
+        );
+      try {
+        return JSON.parse(
+          raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, ''),
+        );
+      } catch {
+        throw new GameError(
+          'El Master no devolvió JSON válido. Puedes concretar la acción y reintentar.',
+          502,
+        );
+      }
+    },
     async story(input, signal) {
       const messages = [
         { role: 'system', content: SYSTEM },
@@ -237,7 +294,7 @@ export function createProvider(
       const result = await cloudflare(
         IMAGE_MODEL,
         {
-          prompt: `Pixel art fantasy adventure scene, 8-bit retro game aesthetic, limited palette, crisp square pixels, landscape composition, no writing, no UI. ${prompt}`,
+          prompt: `Hand-painted fantasy adventure illustration, richly detailed storybook landscape, dramatic amber light and blue mist, cinematic composition, no writing, no UI. ${prompt}`,
           steps: 4,
         },
         signal,

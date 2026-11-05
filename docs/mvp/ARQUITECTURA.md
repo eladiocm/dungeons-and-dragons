@@ -137,3 +137,7 @@ El grafo previo tiene 160 nodos y refleja contratos/hook de juego de una versió
 Engram: guardar acuerdos del usuario, decisiones aprobadas y defectos no obvios, con rutas relativas y claves estables. No guardar secretos, audios del usuario ni fichas personales. La documentación del repositorio mantiene la especificación revisable aunque Engram no esté disponible.
 
 Referencias técnicas: [Node SQLite](https://nodejs.org/api/sqlite.html), guías locales de Next instaladas, fuentes de voz/dictado en `ESPECIFICACION.md`.
+
+## Implementación comprobada (tareas1–6)
+
+Dominio en `src/game`; persistencia/orquestación en `src/server`. SQLite usa tablas sessions/commands/creations/jobs/media, con eventos dentro del estado JSON transaccional. Las esperas de IA ocurren fuera de las transacciones. Las copias se cifran con AES256GCM y `.data/save-key`; conservar la clave es obligatorio para importarlas. Imágenes24 en caché persistente, voz16segmentos/16MB en memoria; cuotas por proceso básicas, aún no autenticación pública ni límites distribuidos. Whisper recibe WAV PCM mono16kHz/16bit de hasta45s; duración validada a partir del audio, no metadatos del cliente. Referencia oficial: https://developers.cloudflare.com/workers-ai/models/whisper-large-v3-turbo/ .

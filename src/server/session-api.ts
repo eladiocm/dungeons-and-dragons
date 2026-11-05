@@ -2,6 +2,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { validatePlan } from '../game/plan-contract.ts';
 import type { GameCommand } from '../game/session-types.ts';
 import { RuleError } from '../game/types.ts';
+import { GameError } from '../lib/game-contract.ts';
 import type { GameService } from './game-service.ts';
 
 const COOKIE = 'dnd_owner';
@@ -157,11 +158,13 @@ export function apiFailure(error: unknown): Response {
   return apiResponse(
     {
       error:
-        error instanceof RuleError
+        error instanceof RuleError || error instanceof GameError
           ? error.message
           : 'No se pudo completar la operación. Reintenta.',
     },
-    error instanceof RuleError ? error.status : 500,
+    error instanceof RuleError || error instanceof GameError
+      ? error.status
+      : 500,
   );
 }
 function commandBody(raw: unknown): {
@@ -224,6 +227,49 @@ function commandBody(raw: unknown): {
 }
 export function createSessionApi(service: GameService) {
   return {
+    async intent(request: Request, sessionId: string) {
+      try {
+        const raw = await jsonBody(request);
+        if (!record(raw)) throw new RuleError('Acción inválida.');
+        exact(raw, ['id', 'actorId', 'text', 'expectedVersion']);
+        if (
+          !Number.isInteger(raw.expectedVersion) ||
+          (raw.expectedVersion as number) < 0 ||
+          typeof raw.text !== 'string' ||
+          !raw.text.trim() ||
+          raw.text.length > 2000
+        )
+          throw new RuleError(
+            'Escribe una acción de hasta 2000 caracteres y revisa la versión.',
+          );
+        return apiResponse(
+          await service.intent(
+            owner(request).hash,
+            id(sessionId),
+            raw.expectedVersion as number,
+            { id: id(raw.id), actorId: id(raw.actorId), text: raw.text.trim() },
+          ),
+        );
+      } catch (error) {
+        return apiFailure(error);
+      }
+    },
+    async narrative(request: Request, sessionId: string) {
+      try {
+        const raw = await jsonBody(request);
+        if (!record(raw)) throw new RuleError('Intervención inválida.');
+        exact(raw, ['messageId']);
+        return apiResponse(
+          await service.narrate(
+            owner(request).hash,
+            id(sessionId),
+            id(raw.messageId, 250),
+          ),
+        );
+      } catch (error) {
+        return apiFailure(error);
+      }
+    },
     async list(request: Request) {
       try {
         requestOrigin(request);

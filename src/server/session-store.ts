@@ -46,10 +46,122 @@ export class SessionStore {
       CREATE INDEX IF NOT EXISTS sessions_owner ON sessions(owner_hash,updated_at);
       CREATE TABLE IF NOT EXISTS creations(owner_hash TEXT NOT NULL,command_id TEXT NOT NULL,request_hash TEXT NOT NULL,session_id TEXT NOT NULL REFERENCES sessions(id),PRIMARY KEY(owner_hash,command_id)) STRICT;
       CREATE TABLE IF NOT EXISTS commands(session_id TEXT NOT NULL REFERENCES sessions(id),command_id TEXT NOT NULL,request_hash TEXT NOT NULL,result_version INTEGER NOT NULL,PRIMARY KEY(session_id,command_id)) STRICT;
+      CREATE TABLE IF NOT EXISTS jobs(session_id TEXT NOT NULL REFERENCES sessions(id),job_key TEXT NOT NULL,request_hash TEXT NOT NULL,lease_until INTEGER NOT NULL,result TEXT,PRIMARY KEY(session_id,job_key)) STRICT;
+      CREATE TABLE IF NOT EXISTS media(cache_key TEXT PRIMARY KEY,data TEXT NOT NULL,created_at INTEGER NOT NULL) STRICT;
     `);
   }
   close(): void {
     this.db.close();
+  }
+  media(key: string): string | undefined {
+    const row = this.db
+      .prepare('SELECT data FROM media WHERE cache_key=?')
+      .get(key);
+    return typeof row?.data === 'string' ? row.data : undefined;
+  }
+  saveMedia(key: string, data: string): void {
+    if (data.length > 10001000)
+      throw new RuleError('Medio demasiado grande.', 413);
+    this.db
+      .prepare(
+        'INSERT OR REPLACE INTO media(cache_key,data,created_at) VALUES(?,?,?)',
+      )
+      .run(key, data, Date.now());
+    this.db
+      .prepare(
+        'DELETE FROM media WHERE cache_key NOT IN (SELECT cache_key FROM media ORDER BY created_at DESC LIMIT 24)',
+      )
+      .run();
+  }
+  replay(
+    owner: string,
+    id: string,
+    commandId: string,
+    hash: string,
+  ): GameSession | undefined {
+    const current = this.read(owner, id),
+      row = this.db
+        .prepare(
+          'SELECT request_hash FROM commands WHERE session_id=? AND command_id=?',
+        )
+        .get(id, commandId);
+    if (!row) return undefined;
+    if (row.request_hash !== hash)
+      throw new RuleError('Ese comando ya se usó con otros datos.', 409);
+    return current;
+  }
+  claim(
+    owner: string,
+    id: string,
+    key: string,
+    hash: string,
+  ): { cached?: string } {
+    return this.transaction(() => {
+      this.read(owner, id);
+      const row = this.db
+        .prepare('SELECT * FROM jobs WHERE session_id=? AND job_key=?')
+        .get(id, key);
+      if (row) {
+        if (row.request_hash !== hash)
+          throw new RuleError(
+            'Ese identificador ya se usó con otros datos.',
+            409,
+          );
+        if (typeof row.result === 'string') return { cached: row.result };
+        if (Number(row.lease_until) > Date.now())
+          throw new RuleError(
+            'El Master ya está preparando esa respuesta. Espera y reintenta.',
+            409,
+          );
+      }
+      this.db
+        .prepare(
+          'INSERT INTO jobs(session_id,job_key,request_hash,lease_until) VALUES(?,?,?,?) ON CONFLICT(session_id,job_key) DO UPDATE SET lease_until=excluded.lease_until',
+        )
+        .run(id, key, hash, Date.now() + 130000);
+      return {};
+    });
+  }
+  finishJob(id: string, key: string, value: string): void {
+    this.db
+      .prepare(
+        'UPDATE jobs SET result=?,lease_until=0 WHERE session_id=? AND job_key=?',
+      )
+      .run(value, id, key);
+  }
+  releaseJob(id: string, key: string): void {
+    this.db
+      .prepare('UPDATE jobs SET lease_until=0 WHERE session_id=? AND job_key=?')
+      .run(id, key);
+  }
+  amendNarration(
+    owner: string,
+    id: string,
+    messageId: string,
+    content: string,
+  ): GameSession {
+    return this.transaction(() => {
+      const state = this.read(owner, id);
+      const amend = (s: GameSession): void => {
+        const message = s.messages.find((m) => m.id === messageId);
+        if (message) {
+          message.content = content;
+          message.narrationPending = false;
+        }
+        if (s.pending) {
+          amend(s.pending.base);
+          if (s.pending.preview) amend(s.pending.preview.state);
+        }
+      };
+      amend(state);
+      state.version++;
+      this.db
+        .prepare(
+          'UPDATE sessions SET state=?,version=?,updated_at=? WHERE id=? AND owner_hash=?',
+        )
+        .run(encode(state), state.version, Date.now(), id, owner);
+      return state;
+    });
   }
   private transaction<T>(fn: () => T): T {
     this.db.exec('BEGIN IMMEDIATE');
