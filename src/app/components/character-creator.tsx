@@ -8,6 +8,7 @@ import {
   FEATS,
   ITEMS,
   LANGUAGES,
+  MASTERY_NAMES,
   SKILLS,
   SPECIES,
   SPELLS,
@@ -625,7 +626,7 @@ export function CharacterCreator({
                 .map(([id, w]) => ({
                   id,
                   name: w.name,
-                  description: `${w.dice[0]}d${w.dice[1]} · ${w.mastery}`,
+                  description: `${w.dice[0]}d${w.dice[1]} · ${MASTERY_NAMES[w.mastery]}`,
                 }))}
               selected={draft.weaponMasteries}
               onChange={(v) => set('weaponMasteries', v)}

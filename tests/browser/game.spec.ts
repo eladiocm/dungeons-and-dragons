@@ -1,6 +1,9 @@
 import { expect, test } from '@playwright/test';
 import { action, create, image, quiet } from './helpers';
 
+// Separate virtual clients retain the real server rate limit.
+test.use({ extraHTTPHeaders: { 'X-Forwarded-For': '198.51.100.11' } });
+
 test('loading does not start a game and reloading a private game does not call AI again', async ({
   page,
 }) => {

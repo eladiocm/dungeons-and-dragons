@@ -39,6 +39,8 @@ export function actionLabel(plan: ActionPlan): string {
   switch (plan.kind) {
     case 'travel':
       return `Ir a ${SCENES[plan.destination].title}`;
+    case 'escape':
+      return 'Escapar hacia el camino sin abandonar la misión';
     case 'attack':
       return `Atacar con ${WEAPONS[plan.weaponId]?.name || plan.weaponId}`;
     case 'cast':
@@ -201,7 +203,8 @@ export function transition(
     throw new RuleError('Identificador de comando inválido.');
   getHero(input, command.actorId);
   if (input.status === 'ended') {
-    if (command.type === 'sync') return structuredClone(input);
+    if (command.type === 'sync')
+      return { ...structuredClone(input), version: input.version + 1 };
     throw new RuleError(
       'La aventura ha terminado. Puedes revisar el diario o crear otra partida.',
     );

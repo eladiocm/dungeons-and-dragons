@@ -1,6 +1,6 @@
 # Plan de aceptación y evidencia
 
-Estado: especificación; esta lista **no significa que las pruebas nuevas existan o pasen**. Base comprobada el 5 de noviembre de 2026: 19 pruebas unitarias existentes, todas correctas. La última revisión anterior tenía además 9 E2E; hay que volver a ejecutarlas al modificar el producto y adaptar los casos al nuevo recorrido.
+Estado 0.4.0: **133 unitarias y 24 E2E correctas**, tipos/lint/build correctos. Esta matriz conserva los criterios de diseño; la evidencia ejecutada y límites se registran en ESTADO.md. Micrófonos/instalación físicos Android/iOS no se consideran probados por usar simulaciones.
 
 ## Principios
 
@@ -43,7 +43,7 @@ Estado: especificación; esta lista **no significa que las pruebas nuevas exista
 4. Mago y clérigo lanzan un conjuro, consumen espacio y respetan límites; rechazar cast ilegal sin perder recurso. Comprobar versiones 2024 de Curar heridas y Dormir.
 5. Caer a 0 y resolver muerte/estabilización con secuencia determinista. Final bloquea nuevas acciones y ofrece epílogo y nueva partida.
 6. Reenviar Tirar tras perder la respuesta devuelve los mismos dados. Recargar durante narración recupera estado; reintento no entrega botín ni resta PG de nuevo.
-7. Dictar con implementación de reconocimiento simulada fiel al contrato: texto provisional → soltar → final tardío permitido del mismo audio → revisión → Enviar. Otra captura/navegación descarta callbacks antiguos.
+7. Dictar con implementación de reconocimiento simulada fiel al contrato: texto provisional → soltar → callbacks tardíos descartados → revisión → Enviar. Otra captura/navegación descarta callbacks antiguos.
 8. Narrar con fixture de audio decodificable, pausar/reanudar y comprobar resaltado/velocidad. Una promesa `play()` vieja no reactiva audio cancelado. No afirmar que este fixture valida naturalidad de voz.
 9. Mesa en móvil con teclado, menú y paneles; escena persiste mientras se conversa. Offline permite lectura; al reconectar el servidor conserva autoridad.
 10. Sesión de otro propietario y peticiones falsificadas se rechazan; inspeccionar que secretos del Master y claves no aparezcan en respuestas/caché/bundle.
@@ -60,3 +60,21 @@ Estado: especificación; esta lista **no significa que las pruebas nuevas exista
 `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`, `npm run test:e2e`, auditoría apropiada de dependencias si cambian y revisión independiente. Revisar diff/staged y ausencia de secretos/datos privados. Una prueba obligatoria pendiente o fallida se registra y no se declara resuelta.
 
 Guardar evidencia con fecha, rama/commit, comandos, totales, navegador y limitaciones. No merge a `main` ni publicación por el solo hecho de haber diseñado o maquetado la interfaz.
+
+## Ejecución del MVP
+
+`tests/browser/fixture-ai.mjs` simula únicamente el proveedor Ollama. Next arranca de producción con `.data/e2e` y se recorren endpoints privados reales. `deterministic-rng.mjs` se precarga solo en ese proceso; la cola de dados de pruebas no tiene endpoint y no se importa desde src. Pruebas seriales y navegador aislado, sin perfil personal ni cuota real en CI.
+
+La suite incluye victoria, fracaso por tiempo, retirada de misión, muerte tras combate/salvaciones, gasto de espacio de mago, escape conservando misión, dos pestañas, respuesta perdida, prosa pendiente, imágenes, archivo legado/offline, voz, dictado y PWA. El reintento de prosa se prueba con el chat desplazado para detectar superposiciones de controles.
+
+Reinicio SQLite se comprueba cerrando/reabriendo y reenviando el mismo comando de dado con RNG que lanza si vuelve a ejecutarse. La cinta y versión recuperadas deben ser idénticas.
+
+La muestra real de voz usa servicios configurados y se guarda aparte de las pruebas deterministas. Whisper cambió palabras en la frase de muestra: no se exige coincidencia textual perfecta a un reconocedor probabilístico, y tampoco se describe como precisión perfecta. La prueba funcional exige respuesta inteligible y conserva revisión/envío manual.
+
+Cada archivo E2E simula una dirección de cliente de TEST-NET-2 distinta mediante cabecera de prueba. La suite completa produce más de 120 solicitudes por minuto; no se eleva ni se desactiva el límite del servidor para hacerla pasar. Cookies, versiones y reglas siguen siendo reales.
+
+## Resultado final — 5 de noviembre de 2026
+
+Rama `develop`, versión 0.4.0. `npm test`: 133/133, sin omitidas ni fallidas. `npm run typecheck -- --incremental false`, `npm run lint` y `npm run build`: salida 0. `npm run test:e2e` sobre la compilación final: 24/24; `test-results/.last-run.json` registra `passed`, sin pruebas fallidas. `npm audit --json`: cero vulnerabilidades conocidas. Capturas finales de mesa de escritorio, mesa móvil y revisión de personaje inspeccionadas.
+
+Navegador de pruebas: Brave/Chromium firmado, controlado por Playwright; se usa `PLAYWRIGHT_CHROMIUM_EXECUTABLE` porque el ejecutable Chromium descargado está bloqueado por WDAC en esta máquina. Esta particularidad local no es un requisito del producto. La revisión independiente final no encontró bloqueos importantes después de corregir los cuatro hallazgos con regresiones. Micrófono físico, instalación móvil y publicación HTTPS quedan pendientes como se indica en ESTADO.md.

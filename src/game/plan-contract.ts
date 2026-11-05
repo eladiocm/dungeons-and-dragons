@@ -133,9 +133,10 @@ export function validatePlan(raw: unknown): ActionPlan {
   const v = object(raw);
   switch (v.kind) {
     case 'travel':
+    case 'escape':
       keys(v, ['kind', 'destination']);
       return {
-        kind: 'travel',
+        kind: v.kind,
         destination: choice(
           v.destination,
           Object.keys(SCENES) as (keyof typeof SCENES)[],

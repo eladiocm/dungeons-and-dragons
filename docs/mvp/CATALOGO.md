@@ -1,10 +1,10 @@
 # Manifiesto de contenido
 
-Estado del motor: creación, reglas, combate, efectos de magia y aventura implementados como funciones puras y verificados por pruebas. Todavía no están conectados a la nueva mesa ni al servidor de sesiones. No confundir este avance con un producto terminado.
+Estado 0.4.0: catálogo conectado al creador, motor, servidor y mesa. Toda opción seleccionable del subconjunto se valida; no representa todo el contenido del SRD.
 
 - Reglas: SRD 5.2.1, español; referencias en REGLAS.md.
 - Nivel 1; guerrero, pícaro, clérigo, mago.
-- Humano (tamaño Mediano en la primera implementación), enano, mediano y alto elfo. Elección de tamaño humano pendiente antes de cerrar el creador.
+- Humano con tamaño Pequeño/Mediano, enano, mediano y alto elfo.
 - Acólito, criminal, erudito y soldado. Paquetes de equipo A; guerrero A/B. Las alternativas de oro sin compra se rechazan.
 - Array estándar editable, mejoras de trasfondo, competencias y sustituciones explícitas, pericia del pícaro, idiomas, dotes de origen y orden divina.
 - Armas: espadón, mangual, jabalina, cimitarra, espada corta, arco largo, daga, arco corto, maza, bastón y lanza. Solo maestrías legales para la clase.
@@ -13,6 +13,6 @@ Estado del motor: creación, reglas, combate, efectos de magia y aventura implem
 - Trucos: guía, llama sagrada, taumaturgia, luz, mano de mago, rayo de escarcha y prestidigitación.
 - Conjuros nivel 1: bendición, curar heridas, escudo de fe, saeta guía, palabra de curación, detectar magia, armadura de mago, caída de pluma, dormir, ola atronadora y proyectil mágico.
 
-Pruebas de creación en `tests/character.test.ts`: PG, CA, iniciativa, competencias/pericia, recursos de clase, paquetes y moneda de clase+trasfondo, preparación/libro/espacios, restricciones y rechazos. Cada entrada de magia y maestría necesitará sus pruebas de resolución en las tareas siguientes antes de ofrecerse en juego.
+Pruebas de creación en `tests/character.test.ts`: PG, CA, iniciativa, competencias/pericia, recursos de clase, paquetes y moneda de clase+trasfondo, preparación/libro/espacios, restricciones y rechazos. Resolución de magia/maestrías en tests/spells.test.ts y combat.test.ts; 64 combinaciones recomendadas en creator.test.ts.
 
 Rasgos de nivel 2 o superior, otras especies/linajes, clases adicionales, compras libres y progresión todavía excluidos. El mundo abierto se conserva como modalidad futura.

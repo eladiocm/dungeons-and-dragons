@@ -296,6 +296,18 @@ export function GameTable({
             Ir al último mensaje
           </button>
         )}
+        {latest?.narrationPending && !game.busy && (
+          <button
+            type="button"
+            className="text-button"
+            onClick={() => {
+              narration.stop();
+              void game.retryNarrative();
+            }}
+          >
+            Reintentar narración del Master
+          </button>
+        )}
         <form
           className="composer"
           onSubmit={(e) => {

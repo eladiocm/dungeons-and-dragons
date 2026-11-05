@@ -1,143 +1,75 @@
-# Arquitectura propuesta del MVP
+# Arquitectura del MVP
 
-Estado: propuesta de implementación, pendiente de aprobar el diseño. No atribuir estos módulos al código actual.
+Implementación 0.4.0, Next 16.4.5/React 19.3.1/TypeScript 7, runtime Node>=24.15. Se verificó Node 24.19; `node:sqlite` usa DatabaseSync, consultas preparadas y WAL. No depende de las APIs cambiadas de Node26.
 
-## Base y fronteras
+## Fronteras
 
-Mantener Next.js 16/React 19 y TypeScript del proyecto. Rutas con runtime Node para IA y almacenamiento. Reutilizar proveedores Cloudflare/Ollama, contratos de voz, límites de solicitudes y PWA donde sigan siendo correctos. Leer primero las guías de la versión instalada de Next.
+- `src/game`: catálogo, fichas, dados, reglas, combate, magia y aventura. Funciones puras con Roller inyectado; no React, red, SQL ni LLM.
+- `src/server`: SessionStore, GameService, Master, copias, validación HTTP y medios. El servidor es la autoridad del estado.
+- `src/app`: creador, mesa y hooks. Consume PublicSession, guarda proyección/borrador/ilustración para lectura, nunca restaura esas copias sobre el servidor.
+- `src/lib`: proveedores, contratos, audio, seguimiento y controlador de dictado. El módulo game-contract también decodifica el archivo antiguo.
 
-Separar cuatro capas:
+Las rutas antiguas `/api/generate-story`, `/api/generate-image` y `/api/narrate` devuelven410. Sus utilidades conservadas no forman parte del flujo nuevo de juego.
 
-1. `domain/`: catálogo tipado, creación, reglas, dados, combate, recursos, inventario y objetivos; funciones puras, sin React, `fetch`, base de datos ni LLM.
-2. `application/`: autorización de participante, comandos, validación de propuestas del Master, transacciones y selección del contexto público/privado.
-3. `infrastructure/`: repositorio de sesiones, proveedores de IA, voz/transcripción, almacenamiento de imágenes y adaptadores. Ninguna clave llega al cliente.
-4. `app/`: asistente de personaje, mesa, hooks de audio/dictado, endpoints y componentes accesibles.
+## Dominio y flujo
 
-El estado se almacena por el servidor. El cliente mantiene una proyección y borradores, sin poder asignarse PG, oro, resultados o conjuros con un POST arbitrario.
+GameSession versión de esquema 2 contiene participantes, BattleState con actores/posiciones/presupuestos, WorldState, eventos, mensajes, objetivos/final, notas privadas y acción pendiente. actorId/participantId están separados; esto prepara contratos para grupo, pero no añade membresías ni conexión multijugador.
 
-## Modelo conceptual
+PublicSession elimina dmState, snapshots base/preview y objetos/NPC no presentes. El cliente no puede suministrar PG, inventario, tiradas o secretos. Los planes son una unión validada, no JSON Patch ni código ejecutable.
 
-```text
-GameSession
-  id, schemaVersion, rulesetVersion, catalogVersion, moduleVersion
-  adventureMode: prepared | open-world (segunda etapa)
-  version, status: setup | active | ended
-  phase: exploration | combat | awaiting-choice | awaiting-roll | narrating | ending
-  participants: [{ participantId, characterId, role, ownerId }]
-  characters: Record<CharacterId, CharacterState>
-  world: { sceneId, time, visibleObjects, facts, objectives, encounter }
-  dmState: { undiscoveredFacts, moduleFlags } // nunca proyección pública
-  pendingAction?, combat?, ending?
+1. Crear recalcula CharacterDraft contra catálogo. No aceptar estadísticas derivadas del navegador.
+2. Intención valida identidad, actor, versión y fase; obtiene arrendamiento persistido; pide al Master una acción tipada o aclaración.
+3. La propuesta pasa por el motor. Si necesita azar se guarda PendingAction sin aplicar efectos.
+4. Tirar guarda una cinta de dados por actor/grupo. Repetir petición no repite RNG. Inspiración y Fortuna tienen ventanas/contadores finitos y solo afectan dados propios.
+5. Confirmar persiste efectos/eventos/mensajes juntos. La base y vista previa son snapshots finitos, sin pending recursivo.
+6. Narrar modifica únicamente el mensaje del evento confirmado. Si falla, los hechos ya quedan guardados y el botón de reintentar prosa no repite mecánica. Las enmiendas se propagan a snapshots pendientes para no resucitar texto antiguo al confirmar.
 
-CharacterState
-  id, identity, classId, speciesId, backgroundId, level
-  abilities, proficiencies, expertise, saves, languages, feats
-  hp, tempHp, armor, movement, conditions, deathSaves
-  inspiration, hitDice, featureUses, spellbook, preparedSpells, slots
-  inventory, equipped, currency
+Se usan `crypto.randomInt`, RNG inyectado en unitarias y preload exclusivo de E2E. No hay semillas ni sobrescrituras de dados en endpoints públicos.
 
-GameEvent
-  id, sessionId, sequence, actionId, actorId, type, payload, timestamp
+## Persistencia
 
-PendingAction
-  id, actorId, intent, supportedAction, choices, rollRequests, status
-  authorizedCosts, targets, preconditions, expectedStateVersion
-```
+Directorio `GAME_DATA_DIR` (defecto `.data`), fuera de Git y del bundle. Creación perezosa al atender peticiones, sin abrir base durante build.
 
-No campos singleton `player` o `enemy` que impidan más participantes. Los eventos hacen referencia a IDs estables. Estado y eventos se guardan juntos; un evento no es un texto libre que vuelva a ejecutar la IA.
+| Tabla | Responsabilidad |
+|---|---|
+| sessions | ID, hash de propietario, versión, estado/eventos JSON y fecha |
+| creations | Clave de creación por propietario y hash de cuerpo |
+| commands | Clave única por sesión, hash de petición y versión resultante |
+| jobs | Arrendamientos y resultados de interpretación/prosa/medios |
+| media | Caché persistente acotada de 24 ilustraciones |
 
-## Almacenamiento y sesión privada
+Transacciones cortas BEGIN IMMEDIATE para creación/CAS/confirmación. Nunca esperar IA dentro de una transacción. Misma clave con diferente cuerpo devuelve409; reintento idéntico devuelve estado actual sin ejecutar el callback. Otra pestaña con versión vieja recibe conflicto y actualiza, conservando borrador.
 
-Propuesta: SQLite en `.data/` para desarrollo y primera instancia Node, mediante API disponible en la versión de Node comprobada; operaciones SQL preparadas y transacciones cortas. Confirmar estabilidad y APIs exactas antes de elegir `node:sqlite` o una librería. No depender de funciones de Node 26 en un runtime 24. Si el alojamiento no garantiza disco persistente, implementar el adaptador remoto antes de desplegar; no tratar SQLite local como almacenamiento multirregión.
+Cookie de 256 bits HttpOnly/SameSite Strict, Secure con HTTPS; solo su SHA256 se guarda. ID de sesión no concede acceso. Comprobar origen exacto y cuerpo limitado. Los límites por proceso protegen un MVP privado; no equivalen a autenticación pública o cuotas distribuidas.
 
-Interfaz `SessionRepository`: crear, leer para un propietario, confirmar transición con versión, recuperar comando repetido, guardar resultado narrativo e importar/exportar. Test de contrato para cada adaptador. Tablas conceptuales: owners, sessions, participants, events, commands y narrative_jobs; índices únicos para secuencia e idempotencia. El módulo original y catálogo son datos versionados del servidor.
+Exportación AES256GCM con clave aleatoria de 32 bytes `.data/save-key`. Cifra secretos y autentica la ficha. Importa una copia con IDs de sesión/mensajes/eventos remapeados. Clave de instalación obligatoria: preservar toda `.data` al migrar. No hay restauración portable por contraseña ni cuenta de usuario.
 
-Identidad MVP: cookie aleatoria opaca de 256 bits; guardar su hash, no el secreto. `HttpOnly`, `SameSite=Strict`, `Secure` bajo HTTPS. Validar origen, límites de cuerpo y permisos en toda ruta de sesión/voz/imagen. El ID de partida por sí solo no concede acceso. Perder la cookie puede impedir continuar en ese navegador: exportación privada para copia y recuperación, sin exportar tokens ni cookies.
+## Master y medios
 
-No migrar contraseñas ni crear un sistema de cuentas todavía. Para grupo, añadir membresías/autenticación sobre `ownerId`/`participantId`; un jugador no puede declarar el `actorId` de otro y obtener acceso.
+Un mismo proveedor con prompts distintos: interpretar intención y narrar hechos confirmados. Contexto acotado: últimos mensajes/eventos, ficha, escena y hechos persistidos. Notas privadas solo para arbitraje; nunca para prompts de imagen o respuestas públicas. Una salida inválida no gasta recursos ni se interpreta por aproximación silenciosa.
 
-`.data/`, medios privados, `.env.local`, reportes y artefactos de prueba fuera de Git. Copias/exportaciones las solicita la persona; no publicarlas en entregables ni logs.
+Operaciones creativas: hechos coherentes, accesos previstos, disposición de NPC presente, estado de objeto visible y botín existente desbloqueado. Predicados del módulo deciden objetivos/final. La prosa no concede oro, daño, poderes ni victoria. La IA puede equivocarse en texto; los hechos y cifras confirmadas están disponibles en el diario/ficha.
 
-## Comandos y respuestas
+| Ruta | Entrada autorizada |
+|---|---|
+| GET/POST /api/sessions | Listar/crear para cookie privada |
+| GET /api/sessions/:id | Proyección pública |
+| POST .../intent | id,actorId,expectedVersion,text |
+| POST .../commands | Comando validado y expectedVersion |
+| POST .../narrative | messageId ya existente |
+| POST .../image | sceneRevision actual; prompt calculado en servidor |
+| POST .../speech | messageId,chunkIndex,voz; texto calculado en servidor |
+| POST .../transcribe | WAV limitado; solo devuelve borrador |
+| GET .../export; POST /api/sessions/import | Copia autenticada privada |
 
-Rutas propuestas (nombres finales quedan al implementador):
+Imágenes ante sceneRevision, no por cada frase. Ilustración local siempre, anterior conservada hasta recibir nueva y copia en IndexedDB. Voz caché de 4 mensajes en cliente y 16 segmentos y 16 MB en servidor. Aura no ofrece marcas por palabra: seguimiento visual estimado con reloj/duración; dispositivo usa boundary si existe.
 
-| Operación | Entrada pública | Efecto |
-| --- | --- | --- |
-| Crear sesión | selección de catálogo + ficha candidata | recalcular y validar todo; no aceptar estadísticas calculadas por cliente |
-| Obtener sesión | ID autorizado | proyección pública y eventos desde una secuencia |
-| Proponer acción | actionId, version, actorId, texto | interpretar, validar, pedir aclaración/elección o crear pendingAction |
-| Elegir | actionId, choiceId, version | consumir una opción legal; no gasto implícito de inspiración/espacios |
-| Tirar | actionId, rollId, version | RNG servidor, guardar resultado; resolver cuando están las elecciones necesarias |
-| Reintentar narración | eventId | generar solo prosa del evento ya confirmado |
-| Ilustrar | sceneRevision autorizado | imagen de lo visible; mantener anterior hasta recibir resultado |
-| Narrar | messageId autorizado + voz | usar texto de la intervención existente; no texto arbitrario ilimitado |
-| Transcribir | audio limitado | devolver borrador, nunca ejecutar una acción |
-| Exportar/importar | esquema versionado validado | nuevo guardado privado; recalcular invariantes y excluir secretos de acceso |
+DictationController independiente de React solo escribe borrador. Generaciones/held evitan permisos, onstop y resultados antiguos; cancelar aborta transcripción. MediaRecorder solo mientras se pulsa, AudioContext convierte a PCM 16 mono a 16 kHz; servidor calcula duración real del WAV y rechaza más de 45 s. No se conserva audio de entrada.
 
-El catálogo público contiene solo opciones y descripciones necesarias para crear personaje. La respuesta de sesión excluye secretos del módulo. Las notas ocultas no deben aparecer en HTML prerenderizado, JS, imágenes, alt-text ni exportaciones públicas.
+## PWA y evolución
 
-## Resolución y fallos
+SW guarda shell y recursos públicos. Excluye toda `/api`, cookies, audio y datos privados. IndexedDB/localStorage del navegador contienen proyección y borrador para lectura privada de ese perfil. Sin servidor no se ejecutan acciones.
 
-1. Comprobar propietario, actor, versión y fase.
-2. Registrar/reutilizar commandId/idempotencia. La misma clave con distinto cuerpo se rechaza.
-3. Interpretar intención con contexto acotado. El LLM devuelve una propuesta tipada, nunca código ejecutable ni SQL. Datos narrativos no sustituyen instrucciones del sistema.
-4. Validar objetivos, visibilidad, alcance, costes, acciones restantes y capacidades. Una propuesta fuera del catálogo no se ejecuta por aproximación silenciosa. Una acción creativa compatible puede convertirse en prueba/adjudicación con consecuencias permitidas por el módulo.
-5. Persistir la acción pendiente antes de solicitar dados. El servidor genera resultados mediante `crypto.randomInt`; la animación solo los representa.
-6. Permitir las decisiones que cambian resultados (inspiración, rasgos opcionales) en la ventana legal antes de cerrar la resolución. No permitir rerolls ilimitados cambiando de commandId.
-7. Confirmar atómicamente nueva versión y eventos de costes, dados, daño, botín y progreso. No mantener transacciones SQLite abiertas mientras espera el LLM.
-8. Pedir narración de hechos ya resueltos, con diálogo y ambiente libre. Rechazar/rehacer campos estructurados que contradigan la resolución. Si falla, mostrar los resultados mecánicos y una explicación segura; dejar reintentar prosa sin repetir efectos.
+Antes de multijugador: cuentas/membresías por participante, sala, turnos y sincronización, cuotas compartidas, repositorio remoto o coordinación persistente. SQLite local no es multirregión. Mundo abierto necesitará generador/validación de lugares, actores, objetivos y finales; no basta cambiar un prompt.
 
-Dos pestañas con la misma versión: solo una transición confirma; la otra recibe conflicto y actualiza. La respuesta perdida de Tirar recupera el resultado anterior. Reiniciar servidor durante narración deja el evento y trabajo pendientes, recuperables sin nuevas tiradas. Acciones pendientes con resultado no pueden borrarse para volver a tirar.
-
-## Master de IA
-
-Tres responsabilidades separadas: interpretar una intención, proponer una respuesta del mundo dentro de hechos/módulo y narrar eventos autorizados. Puede ser el mismo proveedor con prompts distintos, sin un framework de agentes obligatorio.
-
-El Master no decide la acción del héroe, no cambia reglas, no revela secretos, no inventa posesiones, no manipula dados y no altera un final confirmado. Pregunta ante una acción que requiera elección real. No convierte Persuasión en control mental ni obliga a tirar por observar lo obvio.
-
-Contexto: ficha estructurada y recursos actuales; objetivo/hitos; escena pública; hechos y resumen persistidos; ventana reciente del diálogo; secretos únicamente cuando el servidor los necesita para arbitrar. El resumen no tiene autoridad sobre estado ni reemplaza eventos.
-
-Los errores de formato o proveedor no consumen recursos. Presupuesto y cantidad de llamadas acotados por acción. Voz e imágenes comparten cuota con texto: caché por contenido, ilustración solo ante cambio visual, sin reintentos infinitos ni proveedor pagado automático. Añadir autenticación y cuota compartida antes de exposición pública.
-
-El código actual tiene `/api/generate-story` que acepta historial del cliente. La mesa nueva no debe poder usar ese camino para saltarse el motor. Mantenerlo solo para archivo legado, sin efectos de partida, o retirarlo de la ruta nueva.
-
-### Improvisación que cambia el mundo
-
-Decisión propuesta del implementador para cerrar la frontera entre libertad y autoridad: el Master puede crear hechos persistentes y alternativas dentro del mundo preparado, mediante operaciones tipadas y validadas. No queda limitado a escoger entre tres botones, y tampoco recibe acceso a un parche JSON arbitrario del estado.
-
-Operaciones iniciales: añadir un hecho público no contradictorio con procedencia; cambiar disposición de un NPC sin control mental; descubrir o crear un acceso plausible entre lugares existentes; cambiar un objeto del entorno (mover, abrir, romper, encender) conforme a material/estado; transferir un objeto del catálogo desde una fuente existente; activar una amenaza de una plantilla del módulo; revelar o cumplir un hito cuando se satisfacen sus predicados.
-
-El servidor comprueba IDs, ubicación, recursos, precondiciones y resultado de prueba cuando lo hay. El Master propone CD y consecuencia contextual dentro de rangos y plantillas admitidos; el motor calcula bonificadores, dados y resolución. Los hechos nuevos no pueden reescribir una tirada anterior, crear poderes/oro sin fuente, resucitar personajes, modificar reglas o marcar un objetivo sin su condición. Un acuerdo, acceso o solución original se registra como evento, se conserva al recargar y se incluye en contexto futuro.
-
-Ejemplo: «uso la cuerda para entrar por la ventana» puede crear un acceso tras comprobar cuerda, anclaje, distancia y la prueba pertinente; no necesita que el módulo tuviese un botón «ventana». «Convenzo al vigilante de que me deje pasar» puede producir un acuerdo y evitar combate; una tirada alta no obliga a un NPC a aceptar cualquier exigencia. «Tengo una espada legendaria» no crea un objeto poseído.
-
-Una intención fuera de estas capacidades requiere aclaración o explica la limitación con alternativas, sin fingir un efecto que no se guardó. Ampliar el catálogo de operaciones es trabajo de código probado; no una instrucción del jugador al LLM. Crear regiones y campañas enteras pertenece a la futura modalidad abierta.
-
-## Medios y cliente
-
-Un canal de audio activo, cancelación por generación y caché acotada. El reloj del audio manda sobre el resaltado; los eventos de dictado usan IDs de captura para ignorar callbacks antiguos. Cambiar partida, voz o personaje limpia referencias de medios. No reabrir el micrófono por un permiso que se concedió tarde.
-
-IndexedDB: última ilustración y proyección reciente para lectura offline. Es copia del servidor, no autoridad al volver a conectar. Si se supera cuota, conservar estado textual y usar ilustración local de respaldo; no bloquear la partida. Borrador de acción local separado del historial confirmado.
-
-No es necesario WebGL para el MVP: dados pueden animarse con SVG/CSS, conservando fórmula y resultado legibles. Iconos SVG consistentes; evaluar una biblioteca como Lucide antes de añadirla. Evitar un motor 3D y un modelo de voz/transcripción grande en el paquete inicial sin mediciones.
-
-## Entornos y ramas
-
-`develop` para el MVP, `main` como versión integrada. Registrar primero el estado 0.3.0 en un commit de base en develop, preservando los cambios previos; no mezclarlos silenciosamente con la primera regla. Nunca añadir `.env.local` con `git add .` sin revisar lo staged.
-
-Pruebas unitarias con repositorio en memoria y RNG inyectado desde código de pruebas. E2E en build de producción aislada, fixtures IA/audio y SQLite temporal. Ningún endpoint público permite fijar el dado, semilla o ficha del servidor para pruebas.
-
-Publicación posterior: seleccionar hosting compatible, almacenamiento persistente y controles de coste; preparar concreto, verificar y luego integrar/desplegar según alcance autorizado. No hacer upgrade de planes para superar límites.
-
-## Uso de Graphify y Engram
-
-El grafo previo tiene 160 nodos y refleja contratos/hook de juego de una versión anterior; no recoge completamente voz/PWA actual. Se consultó como mapa inicial y se contrastó con código. Regenerar solo después de cambios estructurales; excluir dependencias, claves, `.data`, medios y reportes. Un grafo desactualizado no es prueba de cómo funciona el código.
-
-Engram: guardar acuerdos del usuario, decisiones aprobadas y defectos no obvios, con rutas relativas y claves estables. No guardar secretos, audios del usuario ni fichas personales. La documentación del repositorio mantiene la especificación revisable aunque Engram no esté disponible.
-
-Referencias técnicas: [Node SQLite](https://nodejs.org/api/sqlite.html), guías locales de Next instaladas, fuentes de voz/dictado en `ESPECIFICACION.md`.
-
-## Implementación comprobada (tareas1–6)
-
-Dominio en `src/game`; persistencia/orquestación en `src/server`. SQLite usa tablas sessions/commands/creations/jobs/media, con eventos dentro del estado JSON transaccional. Las esperas de IA ocurren fuera de las transacciones. Las copias se cifran con AES256GCM y `.data/save-key`; conservar la clave es obligatorio para importarlas. Imágenes24 en caché persistente, voz16segmentos/16MB en memoria; cuotas por proceso básicas, aún no autenticación pública ni límites distribuidos. Whisper recibe WAV PCM mono16kHz/16bit de hasta45s; duración validada a partir del audio, no metadatos del cliente. Referencia oficial: https://developers.cloudflare.com/workers-ai/models/whisper-large-v3-turbo/ .
+Grafo estructural actualizado desde `src`, sin claves, dependencias, sesiones ni medios. Sus diagnósticos incluyen referencias externas y relaciones combinadas: consultar `graphify-out/GRAPH_HEALTH.md`; no reemplaza la lectura del código ni garantiza extracción semántica de documentos.

@@ -1,5 +1,8 @@
 import { expect, type Page, test } from '@playwright/test';
 
+// Separate virtual clients retain the real server rate limit.
+test.use({ extraHTTPHeaders: { 'X-Forwarded-For': '198.51.100.10' } });
+
 async function quiet(page: Page) {
   await page.route('**/api/config', (route) =>
     route.fulfill({

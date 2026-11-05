@@ -311,6 +311,14 @@ export interface Weapon {
   mastery: 'graze' | 'sap' | 'nick' | 'vex' | 'slow' | 'topple';
   weight: number;
 }
+export const MASTERY_NAMES: Record<Weapon['mastery'], string> = {
+  graze: 'Rozar',
+  sap: 'Debilitar',
+  nick: 'Mellar',
+  vex: 'Molestar',
+  slow: 'Ralentizar',
+  topple: 'Derribar',
+};
 export const WEAPONS: Record<string, Weapon> = {
   greatsword: {
     name: 'Espadón',

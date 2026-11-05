@@ -6,6 +6,7 @@ import {
   BACKGROUNDS,
   CLASSES,
   FEATS,
+  MASTERY_NAMES,
   SKILLS,
   SPECIES,
   SPELLS,
@@ -259,7 +260,12 @@ export function CharacterSheet({
                 return (
                   <details key={id}>
                     <summary>{name}</summary>
-                    <p>{description}</p>
+                    <p>
+                      {description}
+                      {id === 'weaponMastery'
+                        ? ` ${hero.weaponMasteries.map((w) => `${WEAPONS[w].name}: ${MASTERY_NAMES[WEAPONS[w].mastery]}`).join('; ')}.`
+                        : ''}
+                    </p>
                   </details>
                 );
               })}

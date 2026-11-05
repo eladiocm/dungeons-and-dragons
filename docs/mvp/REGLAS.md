@@ -1,6 +1,6 @@
 # Investigación y alcance de reglas
 
-Fecha: 5 de noviembre de 2026. Fuente principal: [SRD 5.2.1 español oficial](https://media.dndbeyond.com/compendium-images/srd/5.2/SP_SRD_CC_v5.2.1.pdf). Las páginas indicadas son las impresas. Este documento es una síntesis para construir el motor, no sustituye las descripciones completas del SRD.
+Fecha: 5 de noviembre de 2026. Fuente principal: [SRD 5.2.1 en español oficial](https://media.dndbeyond.com/compendium-images/srd/5.2/SP_SRD_CC_v5.2.1.pdf). Las páginas indicadas son las impresas. Este documento es una síntesis para construir el motor, no sustituye las descripciones completas del SRD.
 
 ## Procedimiento de referencia
 
@@ -89,3 +89,11 @@ No se implementan en el primer MVP: niveles superiores, multiclase, compras libr
 Esta obra incluye material procedente del documento de referencia del sistema 5.2.1 (“SRD 5.2.1”) de Wizards of the Coast LLC, disponible en https://www.dndbeyond.com/srd. La licencia sobre el SRD 5.2.1 se concede de acuerdo con la licencia internacional de atribución/reconocimiento 4.0 de Creative Commons, disponible en https://creativecommons.org/licenses/by/4.0/legalcode.
 
 Las síntesis, traducciones de interfaz, selección de catálogo y adaptaciones descritas son cambios de este proyecto. Consultar también el aviso íntegro de la primera página del SRD y conservarlo al incorporar material. [Referencia de publicación del SRD](https://www.dndbeyond.com/srd).
+
+## Adaptaciones originales del módulo implementadas
+
+Bram es un guardián original de 6 PG/CA 12, ataque +3 y 1d4+1, ajustado al juego individual. No es un bloque de monstruo del SRD. Si todos los héroes caen y alguno sigue vivo, deja de atacar y vuelve a custodiar: se cierra el encuentro, sin curación ni estabilización gratuita. El jugador aún resuelve muerte/estabilización y, si sobrevive, el reloj de 1d4 h de recuperación. No avanzar horas con una iniciativa congelada.
+
+Se puede escapar del molino hacia el camino preservando la misión. Se usa el movimiento restante para alcanzar la salida y alejarse de enemigos adyacentes; las oportunidades se resuelven normalmente. Destrabarse las evita y Correr permite más movimiento. Bram permanece en su puesto. Abandonar toda la misión es otro plan distinto con final por retirada. El umbral de salida del escenario es una abstracción espacial del módulo, no una regla universal del SRD.
+
+Las pinzas emplean el mismo flujo de daño/concentración que el combate. Los consumibles se reducen antes de clonar el objetivo curado. Los efectos de un turno no sobreviven a viajes/descansos de muchos minutos. Dos pociones y una bolsa de componentes son provisiones originales de la aventura para una persona.

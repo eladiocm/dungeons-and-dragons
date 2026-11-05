@@ -54,6 +54,20 @@ function endCombatIfNeeded(result: ActionResult): void {
     result.facts.push(
       'El enfrentamiento termina. Puedes decidir qué hacer con lo que queda en la escena.',
     );
+  } else if (
+    enemies.every((id) => id === 'bram') &&
+    state.participants.every(
+      (p) => state.battle.actors[p.characterId].hp.current === 0,
+    ) &&
+    state.participants.some((p) => !state.battle.actors[p.characterId].dead)
+  ) {
+    state.battle.inCombat = false;
+    state.phase = 'exploration';
+    state.world.npcDisposition.bram = 'neutral';
+    state.world.sceneRevision++;
+    result.facts.push(
+      'Bram cesa el ataque al verte caer y vuelve a custodiar el molino. El enfrentamiento termina; todavía debes resolver tus salvaciones contra muerte y las consecuencias del tiempo transcurrido.',
+    );
   }
 }
 function advanceEnemies(result: ActionResult, roller: Roller): void {
@@ -328,7 +342,20 @@ export function executePlan(
           !hasCondition(actor, 'unconscious')
         );
       });
-      if (state.battle.inCombat && danger)
+      const atExit =
+        state.world.sceneId === 'mill' &&
+        plan.destination === 'road' &&
+        state.battle.positions[actorId].x <= -6 &&
+        currentNpcIds(state).every(
+          (id) =>
+            state.world.npcDisposition[id] !== 'hostile' ||
+            state.battle.actors[id].dead ||
+            distance(
+              state.battle.positions[actorId],
+              state.battle.positions[id],
+            ) > 1.5,
+        );
+      if (state.battle.inCombat && danger && !atExit)
         throw new RuleError('Primero debes salir del enfrentamiento.');
       const from = state.world.sceneId;
       if (
@@ -357,6 +384,55 @@ export function executePlan(
       result.facts.push(
         `Llegas a ${SCENES[plan.destination].title}. ${SCENES[plan.destination].description}`,
       );
+      break;
+    }
+    case 'escape': {
+      if (
+        !state.battle.inCombat ||
+        state.world.sceneId !== 'mill' ||
+        plan.destination !== 'road'
+      )
+        throw new RuleError(
+          'En esta escena puedes escapar del molino hacia el camino durante el enfrentamiento.',
+        );
+      const from = state.battle.positions[actorId],
+        adjacent = currentNpcIds(state).filter(
+          (id) =>
+            state.world.npcDisposition[id] === 'hostile' &&
+            !state.battle.actors[id].dead &&
+            distance(from, state.battle.positions[id]) <= 1.5,
+        ),
+        exitX = Math.min(
+          -6,
+          from.x,
+          ...adjacent.map((id) => state.battle.positions[id].x - 3),
+        ),
+        moved = executePlan(
+          state,
+          actorId,
+          { kind: 'move', x: exitX, y: 0 },
+          roller,
+        );
+      Object.assign(state, moved.state);
+      result.facts.push(...moved.facts);
+      result.rolls.push(...moved.rolls);
+      if (
+        state.battle.actors[actorId].hp.current === 0 ||
+        state.status === 'ended'
+      )
+        break;
+      const left = executePlan(
+        state,
+        actorId,
+        { kind: 'travel', destination: 'road' },
+        roller,
+      );
+      Object.assign(state, left.state);
+      result.facts.push(
+        ...left.facts,
+        'Bram permanece en su puesto. Has salido del enfrentamiento.',
+      );
+      result.rolls.push(...left.rolls);
       break;
     }
     case 'interact':
@@ -577,11 +653,10 @@ export function executePlan(
       if (item.catalogId === 'healing-potion') {
         if (!budget.bonus)
           throw new RuleError('La poción necesita tu acción adicional.');
-        state.battle.actors[targetId] = heal(
-          target,
-          actionDice(result, actorId, 'Poción de curación', 2, 4, roller) + 2,
-        );
+        const healing =
+          actionDice(result, actorId, 'Poción de curación', 2, 4, roller) + 2;
         item.quantity--;
+        state.battle.actors[targetId] = heal(target, healing);
         budget.bonus = false;
         result.facts.push(
           `Usas una poción. ${target.name} tiene ${state.battle.actors[targetId].hp.current}/${target.hp.max} PG.`,
@@ -667,6 +742,10 @@ export function executePlan(
           if (
             !isHero(enemy) &&
             enemy.hp.current > 0 &&
+            !enemy.dead &&
+            !['incapacitated', 'unconscious', 'paralyzed', 'stunned'].some(
+              (c) => hasCondition(enemy, c),
+            ) &&
             state.world.npcDisposition[id] === 'hostile' &&
             state.battle.budgets[id].reaction &&
             distance(from, state.battle.positions[id]) <= 1.5 &&
@@ -794,6 +873,13 @@ export function executePlan(
       if (hero.dead || hero.hp.current !== 0)
         throw new RuleError('No corresponde una salvación contra muerte.');
       if (hero.deathSaves.stable) {
+        if (state.battle.inCombat) {
+          endCombatIfNeeded(result);
+          if (state.battle.inCombat)
+            throw new RuleError(
+              'El combate sigue en curso. La recuperación de horas debe esperar al final del encuentro o a que alguien te cure.',
+            );
+        }
         const hours = actionDice(
           result,
           actorId,
@@ -829,7 +915,7 @@ export function executePlan(
         ) {
           appendBattle(result, spellEndTurn(state.battle, actorId, roller));
           advanceEnemies(result, roller);
-        }
+        } else if (!state.battle.inCombat) advanceTime(state, 1);
       }
       break;
     }

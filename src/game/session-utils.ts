@@ -131,7 +131,9 @@ export function advanceTime(state: GameSession, rounds: number): void {
   state.battle.time = state.world.time;
   for (const actor of Object.values(state.battle.actors)) {
     actor.conditions = actor.conditions.filter(
-      (c) => c.expires === undefined || c.expires > state.world.time,
+      (c) =>
+        (c.expires === undefined || c.expires > state.world.time) &&
+        !(rounds >= 10 && c.data?.endsPhase),
     );
     if (isHero(actor)) {
       actor.ac = effectiveAc(actor);

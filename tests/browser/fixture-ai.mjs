@@ -16,7 +16,21 @@ const server = createServer(async (req, res) => {
     else {
       const t = data.intencion.toLowerCase();
       let plan;
-      if (t.includes('camino')) plan = { kind: 'travel', destination: 'road' };
+      if (t.includes('descanso largo')) plan = { kind: 'rest', rest: 'long' };
+      else if (t.includes('abandono')) plan = { kind: 'retreat' };
+      else if (t.includes('huyo'))
+        plan = { kind: 'escape', destination: 'road' };
+      else if (t.includes('proyectil'))
+        plan = {
+          kind: 'cast',
+          spellId: 'magicMissile',
+          targetIds: ['bram'],
+          options: { source: 'class' },
+        };
+      else if (t.includes('ataco'))
+        plan = { kind: 'attack', targetId: 'bram', weaponId: 'quarterstaff' };
+      else if (t.includes('camino'))
+        plan = { kind: 'travel', destination: 'road' };
       else if (t.includes('molino'))
         plan = { kind: 'travel', destination: 'mill' };
       else if (t.includes('conven'))

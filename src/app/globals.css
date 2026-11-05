@@ -2380,3 +2380,11 @@ summary::marker {
     text-underline-offset: 4px;
   }
 }
+
+/* Recovery actions must never sit beneath a floating jump control. */
+.unread-button {
+  position: static;
+  flex-shrink: 0;
+  margin: 4px 12px;
+  min-height: 44px;
+}

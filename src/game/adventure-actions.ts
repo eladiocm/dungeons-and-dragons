@@ -1,7 +1,7 @@
-import { hasCondition } from './battle-effects.ts';
+import { damageActor, hasCondition } from './battle-effects.ts';
 import { SKILLS } from './catalog.ts';
+import type { BattleResolution } from './combat-types.ts';
 import { resolveD20, rollDice } from './dice.ts';
-import { applyDamage } from './rules.ts';
 import type {
   ActionPlan,
   ActionResult,
@@ -407,9 +407,17 @@ export function interact(
         4,
         roller,
       );
-      state.battle.actors[actorId] = applyDamage(hero, damage, 'bludgeoning');
+      const hit: BattleResolution = {
+        state: state.battle,
+        facts: [],
+        rolls: [],
+      };
+      damageActor(hit, actorId, damage, 'bludgeoning', roller);
+      state.battle = hit.state;
+      result.facts.push(...hit.facts);
+      result.rolls.push(...hit.rolls);
       result.facts.push(
-        `El mecanismo te golpea y sufres ${damage} de daño, pero consigues liberar la lente.`,
+        'El mecanismo te golpea, pero consigues liberar la lente.',
       );
     }
     takeLens(result, actorId);

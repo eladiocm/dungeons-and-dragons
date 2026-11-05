@@ -1,71 +1,56 @@
-# Calabozos y Dragones — aventura con IA gratuita
+# Calabozos y Dragones — La última luz de Valdumbría
 
-## Evolución al MVP SRD
+MVP 0.4.0 en español para jugar una aventura de fantasía en solitario. Creas un personaje de nivel 1, revisas su ficha y decides cuándo iniciar. El Master interpreta tus acciones libres y narra; el motor aplica las reglas, los dados y los cambios de la partida.
 
-El desarrollo continúa en `develop`. La versión ejecutable 0.3.0 sigue siendo una aventura narrativa; la creación de personaje, el motor SRD, combate y dados están **en desarrollo, todavía sin habilitar**. El alcance elegido es SRD 5.2.1 español, nivel 1 y guerrero, pícaro, clérigo y mago. Primero aventura preparada con acciones libres; mundo abierto en una segunda etapa.
+Basado en el **SRD 5.2.1**, con un catálogo reducido: guerrero, pícaro, clérigo y mago; humano, enano, mediano y alto elfo; cuatro trasfondos. La aventura original tiene objetivos y desenlaces por victoria, fracaso, retirada o muerte. Mundo abierto y multijugador quedan para otra etapa.
 
-Consulta [la especificación y documentación del MVP](docs/mvp/README.md), [el estado real](docs/mvp/ESTADO.md) y [la guía para agentes](AGENTS.md). El diseño incluye voz, dictado con revisión, mesa adaptable, persistencia y criterios de pruebas. Las propuestas de catálogo y límites de sincronización/dictado han sido aprobadas por el usuario.
+## Ejecutar en Windows
 
-Aventura conversacional en español: eliges acciones, un narrador de IA desarrolla la historia y un segundo modelo ilustra las escenas con estética pixel art. Es un juego narrativo inspirado en D&D; no implementa fichas, dados ni reglas oficiales.
-
-## Opción recomendada: Cloudflare Workers AI
-
-- Narración: `@cf/meta/llama-3.3-70b-instruct-fp8-fast`.
-- Imágenes: `@cf/black-forest-labs/flux-1-schnell`.
-- Una cuenta y un token para ambos. No requiere GPU propia ni servidor desplegado en Cloudflare: Next.js llama a su API REST.
-- La asignación gratuita es de **10.000 neuronas al día**, compartida entre modelos y aplicaciones de la cuenta. Se renueva a las 00:00 UTC. En **Workers Free**, al agotarla se detienen las llamadas; en Workers Paid, el exceso puede facturarse. **Conserva Workers Free si quieres evitar cargos.** Esta aplicación no cambia planes ni activa proveedores de pago. La disponibilidad/cuota puede cambiar.
-
-Se eligió Cloudflare porque cubre texto e imágenes con una sola cuenta y una cuota renovable. Groq es otra opción para texto, pero no resuelve las imágenes. Pollinations actualmente usa claves/Pollen; no se asume que su API sea ilimitada y gratuita. Para texto local sin cuota de proveedor se incluye Ollama.
-
-Fuentes oficiales, consultadas el 4 de noviembre de 2026:
-- https://developers.cloudflare.com/workers-ai/platform/pricing/
-- https://developers.cloudflare.com/workers-ai/models/llama-3.3-70b-instruct-fp8-fast/
-- https://developers.cloudflare.com/workers-ai/models/flux-1-schnell/
-- https://developers.cloudflare.com/workers-ai/get-started/rest-api/
-
-## Requisitos y arranque en Windows
-
-Node.js **24.15 o posterior** (este proyecto se verificó con Node 24). npm. Internet para Cloudflare. Se usa exclusivamente `package-lock.json` para instalar las versiones comprobadas.
+Necesitas **Node.js >=24.15** y npm. Verificado con Node 24.19. Para IA remota hace falta Internet y una cuenta gratuita de Cloudflare; para texto local puedes usar Ollama.
 
 ```powershell
 cd "C:\Users\PM_EC\Documents\WORKS\dungeons-and-dragons"
 npm ci
+# Solo si todavía no tienes .env.local:
 Copy-Item .env.example .env.local
-```
-
-Si `.env.local` ya existe y contiene tus credenciales, **no lo sustituyas**. Si configuras desde cero, abre Cloudflare → Workers AI → Use REST API. Copia Account ID y crea un token de esa cuenta con permiso Workers AI Read (inferencia). La plantilla de Cloudflare también puede incluir Edit, pero esta aplicación no necesita gestionar recursos.
-
-```dotenv
-AI_PROVIDER=cloudflare
-CLOUDFLARE_ACCOUNT_ID=tu_account_id_de_32_caracteres
-CLOUDFLARE_API_TOKEN=tu_token
-ENABLE_IMAGES=true
-```
-
-El token se usa solo en el servidor. `.env.local` está excluido de Git; nunca lo compartas ni uses una variable `NEXT_PUBLIC_` para claves. Reinicia Next.js tras cambiar las variables.
-
-```powershell
 npm run dev
 ```
 
-Abre http://localhost:3000. Para producción local:
+Conserva las credenciales existentes: no sobrescribas `.env.local`. Abre [localhost:3000](http://localhost:3000). Para producción local:
 
 ```powershell
 npm run build
 npm start
 ```
 
-Hace falta un servidor Node.js; las rutas de IA impiden exportar esta app como web estática. El MVP en develop utiliza SQLite en `.data/game.sqlite` y requiere un disco persistente. El límite de peticiones es básico, por proceso; antes de exponerla públicamente añade autenticación y límites compartidos para proteger tu cuota.
+Las partidas se guardan automáticamente en SQLite (`.data/game.sqlite`). La carpeta se crea al usar la API; no necesita un servicio de base de datos externo. Se requiere **un servidor Node y disco persistente**. Esta implementación no se exporta como web estática, no corre sin adaptar sobre Edge/Workers y no debe instalarse sobre almacenamiento efímero.
 
-## Alternativa local: Ollama
+## IA gratuita y voz
 
-Instala Ollama desde https://ollama.com/download y descarga el modelo:
+Configuración recomendada:
+
+```dotenv
+AI_PROVIDER=cloudflare
+CLOUDFLARE_ACCOUNT_ID=tu_account_id
+CLOUDFLARE_API_TOKEN=tu_token_workers_ai
+ENABLE_IMAGES=true
+ENABLE_VOICE=true
+```
+
+El token se usa exclusivamente en el servidor y requiere inferencia de Workers AI para la cuenta. Cloudflare ofrece una asignación gratuita compartida de **10.000 neuronas diarias**; texto, ilustraciones, voz y transcripción consumen esa cuota. Se renueva a las 00:00 UTC. Mantén **Workers Free** para que el agotamiento detenga las llamadas; este proyecto no activa planes ni proveedores de pago automáticamente. No se promete uso ilimitado.
+
+- Master: Llama 3.3 70B, salida JSON validada.
+- Ilustración: FLUX.1 schnell, solo ante cambios de escena. Siempre hay una ilustración local de respaldo.
+- Voz española: Aura 2; Néstor, Carina o Javier. Alternativa: voz del dispositivo, de calidad dependiente del sistema.
+- Dictado grabado: Whisper large v3 turbo. El reconocimiento en vivo usa la implementación del navegador cuando existe.
+
+Fuentes oficiales: [precios y cuota](https://developers.cloudflare.com/workers-ai/platform/pricing/), [Llama 3.3](https://developers.cloudflare.com/workers-ai/models/llama-3.3-70b-instruct-fp8-fast/), [FLUX](https://developers.cloudflare.com/workers-ai/models/flux-1-schnell/), [Aura español](https://developers.cloudflare.com/workers-ai/models/aura-2-es/), [Whisper](https://developers.cloudflare.com/workers-ai/models/whisper-large-v3-turbo/).
+
+Para texto local:
 
 ```powershell
 ollama pull qwen3:4b
 ```
-
-Configura:
 
 ```dotenv
 AI_PROVIDER=ollama
@@ -74,77 +59,50 @@ OLLAMA_MODEL=qwen3:4b
 ENABLE_IMAGES=false
 ```
 
-Ollama debe estar iniciado. Qwen3 4B ocupa aproximadamente 2,5 GB de descarga y necesita memoria adicional; la velocidad depende de CPU/GPU y RAM. No se descarga automáticamente. La narración no utiliza servicios de pago; sí consume recursos y electricidad del equipo. Para ilustraciones opcionales puedes conservar las credenciales de Cloudflare y `ENABLE_IMAGES=true`.
+Ollama requiere memoria/CPU o GPU propias; no se instala ni descarga automáticamente. Puedes conservar las credenciales de Cloudflare para medios. Ninguna clave debe usar prefijo `NEXT_PUBLIC_`, aparecer en Git, capturas o mensajes.
 
-Fuente del modelo: https://ollama.com/library/qwen3:4b
+## Cómo jugar
 
-## Uso y guardado
+1. Elige clase y especie, origen, atributos, talentos, magia e idiomas. Hay una propuesta editable y revisión final; cambiar los orígenes reajusta la propuesta para mantenerla válida.
+2. Inicia la aventura. Lee o escucha el entorno y el objetivo. La narración automática está activada de forma predeterminada; se puede desactivar en el menú de tres puntos.
+3. Escribe lo que intentas hacer. El Master pide aclaración si falta una elección y el motor rechaza lo imposible o no implementado sin gastar recursos.
+4. Si se necesitan dados, pulsa Tirar. Revisa el resultado y los recursos legales de repetición; al Confirmar se aplican los efectos una vez. Una tirada hecha no puede cancelarse para buscar otra.
+5. Consulta PG, CA, habilidades, equipo, conjuros y recursos. En combate, decide tu acción y finaliza el turno. Puedes huir del encuentro del molino sin abandonar toda la misión; el movimiento y las reacciones siguen contando.
 
-La primera escena comienza automáticamente cuando el narrador está configurado. Enter envía; Shift+Enter añade una línea. Las escenas y descripciones se guardan en este navegador. Al recargar se recupera la conversación sin volver a llamar a la IA. Las imágenes no se guardan para evitar llenar el almacenamiento; puedes volver a ilustrarlas manualmente.
+La voz usa controles de iconos sobre el diario. El seguimiento con voz natural es **aproximado**, basado en duración; la voz del dispositivo usa eventos de palabra cuando están disponibles. El navegador puede requerir pulsar Reproducir por su política de audio.
 
-Un fallo de imagen no bloquea la historia. Los botones permiten reintentar solo la imagen o la escena fallida sin duplicar la acción. Nueva aventura cancela las peticiones pendientes. Puedes desactivar las ilustraciones para ahorrar cuota.
+Mantén pulsado el micrófono para dictar; suéltalo para revisar. Donde no hay dictado en vivo, se graba mientras mantienes pulsado y se transcribe después. Máximo 45 s. **Nunca se envía automáticamente.** Corrige el borrador y pulsa Enviar. El reconocimiento puede equivocarse; no se garantiza captura ni reconocimiento sin Internet. No se conservan grabaciones en el servidor.
 
-En partidas largas se conserva la escena inicial y un máximo de 199 mensajes recientes guardados. La IA recibe un contexto acotado: puede olvidar detalles antiguos que no figuren en ese contexto. El guardado no se sincroniza entre dispositivos ni es una copia de seguridad.
+## Guardados y copias privadas
 
-## Comprobaciones
+La identidad del MVP es una cookie opaca HttpOnly de ese navegador, sin cuentas ni sincronización entre dispositivos. Perder la cookie puede impedir continuar: descarga antes una copia desde el menú.
+
+Las copias están cifradas y autenticadas, ocultan los secretos del Master y no contienen credenciales ni cookies. **Solo pueden importarse con la misma clave de instalación** (`.data/save-key`). Para migrar o restaurar, respalda toda `.data` con el servidor detenido, incluida esa clave. La importación crea otra partida privada y conserva la original.
+
+El historial antiguo 0.3 se conserva como archivo de lectura, sin inventarle ficha o tiradas. Sin conexión puedes consultar la última proyección y la ilustración guardadas; las acciones esperan al servidor. Los borradores se guardan por separado.
+
+## Móvil y PWA
+
+La mesa usa escena/chat/ficha/dados en escritorio y pestañas Diario/Ficha/Dados en móvil. Instalar está dentro del menú. Android ofrece instalación si el navegador la admite; en iPhone se usa Safari → Compartir → Añadir a pantalla de inicio.
+
+El teléfono necesita una dirección **HTTPS accesible y backend activo**; `localhost` del PC no es una dirección del teléfono. Configura `APP_ORIGIN` con el origen exacto al publicar o probar por red. Véase [despliegue y límites](docs/mvp/DESPLIEGUE.md).
+
+## Desarrollo, pruebas y arquitectura
+
+Trabajo en `develop`; `main` sigue separada. El dominio puro está en `src/game`, persistencia/Master/API en `src/server` y mesa/hooks en `src/app`. No hay motor mecánico alternativo en la prosa de la IA.
 
 ```powershell
 npm test
-npm run typecheck
+npm run typecheck -- --incremental false
 npm run lint
-npm audit
 npm run build
-npx playwright install chromium
 npm run test:e2e
 ```
 
-Los tests de navegador simulan las APIs para reproducir errores, cuota agotada, guardado y cancelaciones sin consumir cuota real. Para usar un Chromium compatible ya instalado puedes indicar `PLAYWRIGHT_CHROMIUM_EXECUTABLE` con su ruta. Las pruebas reales de narración e imagen usan las credenciales de `.env.local`; los tests unitarios no necesitan claves.
+Los E2E usan un proveedor simulado local y SQLite de pruebas. El RNG controlado se carga **solo en el proceso de pruebas**, nunca por endpoint ni en la aplicación de producción. Si Playwright no tiene Chromium instalado, indica un ejecutable compatible mediante `PLAYWRIGHT_CHROMIUM_EXECUTABLE`; la verificación local usó Brave aislado.
 
-## Estructura
+Consulta [documentación del MVP](docs/mvp/README.md), [evidencia y límites](docs/mvp/ESTADO.md), [arquitectura](docs/mvp/ARQUITECTURA.md), [reglas](docs/mvp/REGLAS.md), [catálogo](docs/mvp/CATALOGO.md), [pruebas](docs/mvp/PRUEBAS.md) y [guía para agentes](AGENTS.md). El grafo estructural de código está en `graphify-out`; su informe registra las limitaciones de extracción.
 
-- `src/lib/ai-provider.ts`: Cloudflare y Ollama; tiempos de espera y errores seguros.
-- `src/lib/game-contract.ts`: validación, contexto y formato del guardado.
-- `src/lib/game-api.ts`: límites de peticiones/cuerpo y rutas de generación.
-- `src/app/hooks/use-game.ts`: partida, guardado, cancelación y reintentos.
-- `src/app/api/config`: estado de configuración sin secretos.
-- `tests`: contratos y flujo de juego en navegador.
+## Atribución
 
-## Resolución de problemas
-
-- **Falta configurar el narrador:** revisa el Account ID y el token en `.env.local`; reinicia Next.
-- **Credenciales rechazadas:** comprueba que el token es de la misma cuenta y tiene acceso a Workers AI.
-- **Cuota o límite agotado:** espera; no hay reintentos automáticos ni cambio a un modelo de pago.
-- **Ollama no conecta:** inicia Ollama y comprueba `ollama list`; la URL debe ser local.
-- **No se guarda:** el modo privado o un navegador lleno pueden bloquear localStorage; se muestra un aviso y la pestaña sigue funcionando.
-
-## Voz natural y lectura de escenas
-
-Cada escena incluye la pregunta al jugador dentro del mismo mensaje. El botón **Escuchar escena** lee ese texto completo. Elige una de las voces españolas, usa pausa/reanudación/detener o activa **Leer nuevas escenas**. El navegador puede requerir un primer toque para permitir el audio; las escenas guardadas no se reproducen automáticamente al recargar.
-
-La voz natural usa `@cf/deepgram/aura-2-es` mediante el token existente. No requiere otra cuenta. **Consume la cuota gratuita diaria compartida** con texto e imágenes; no es voz ilimitada. Se cachean temporalmente audios repetidos en servidor y en la pestaña, de forma acotada. No se guardan audios en el service worker. Puedes desactivarla en el servidor con `ENABLE_VOICE=false`.
-
-La alternativa **Voz del dispositivo** usa la síntesis del navegador y no consume cuota de Cloudflare. Su calidad, idioma y funcionamiento sin Internet dependen de las voces instaladas en el móvil o equipo. No se cambia silenciosamente a un proveedor de pago.
-
-La voz natural usa pausas y expresividad propias del modelo, con texto escrito para leerse en voz alta. No hay clonación de voz ni controles de emoción no soportados por el proveedor.
-
-Documentación: https://developers.cloudflare.com/workers-ai/models/aura-2-es/
-
-## Ilustraciones según la escena
-
-El narrador decide si un cambio visual importante merece una nueva imagen: otro lugar, una aparición, amenaza o revelación. Una conversación o una acción menor en el mismo escenario conserva la escena. La primera escena siempre puede ilustrarse. Este criterio es una decisión del modelo y puede variar según la historia.
-
-## PWA y móvil
-
-La aplicación incluye manifiesto, iconos de instalación, modo independiente y service worker. En Android usa **Instalar aplicación** en el menú (o el botón si está disponible). En iPhone abre la URL en Safari → Compartir → Añadir a la pantalla de inicio.
-
-**Para instalarla y usarla desde un móvil hace falta una URL HTTPS accesible al móvil y un servidor Node activo.** `127.0.0.1` en el teléfono se refiere al propio teléfono, no a tu PC. Esta actualización prepara la PWA local; no publica el proyecto ni configura un dominio. El desarrollo en localhost funciona como contexto seguro para probar la instalación y el service worker. Un acceso HTTP por IP de red normalmente no habilita estas funciones.
-
-Después de una primera visita completa, puede abrirse sin conexión y mostrar la conversación guardada. Generar escenas, imágenes o voz de Cloudflare sigue requiriendo Internet. Las ilustraciones y audios no se guardan para lectura offline. El service worker cachea únicamente la interfaz pública y recursos estáticos; nunca `/api`, credenciales o cuerpos de peticiones. El guardado sigue perteneciendo a ese navegador/origen: un dominio nuevo no importa automáticamente las partidas del localhost.
-
-El diseño se adapta al ancho móvil, las zonas seguras y el teclado; la entrada mantiene 16px y los controles principales permiten interacción táctil. Se verifican vistas móviles en navegador, no se sustituye la comprobación final en un teléfono físico.
-
-## Guardado del MVP en develop
-
-Las partidas son privadas mediante cookie HttpOnly del navegador; no son cuentas sincronizadas entre dispositivos. No borres las cookies sin exportar antes. El servidor guarda SQLite, claves y archivos en `GAME_DATA_DIR` (por defecto `.data/`, excluido de Git). Configura `APP_ORIGIN` con el origen exacto al usar dominio o red local. No desplegar esta versión sobre disco efímero ni runtime Edge.
-
-Las copias descargadas están cifradas y autenticadas: ocultan secretos del Master y no permiten editar la ficha para importar estadísticas falsas. Solo se pueden importar en una instalación que conserve la misma `.data/save-key`. Para migrar o restaurar el servidor conserva el directorio `.data` completo, incluida esa clave, con el servidor detenido. La importación crea una nueva partida privada, sin sobrescribir la original. No contiene cookie de acceso ni credenciales de IA.
+Esta obra incluye material procedente del Documento de Referencia del Sistema 5.2.1 de Wizards of the Coast LLC, disponible en [D&D Beyond](https://www.dndbeyond.com/srd), bajo [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/legalcode). La selección, síntesis y adaptaciones se explican en la documentación. Valdumbría, sus personajes y sus escenas locales son originales. No es un producto oficial de Wizards of the Coast. [Aviso](public/attribution.txt).

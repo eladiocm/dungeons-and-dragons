@@ -1,49 +1,39 @@
-# Estado del desarrollo
+# Estado del MVP 0.4.0
 
-Actualizado: 5 de noviembre de 2026.
+5 de noviembre de 2026. Rama `develop`, repositorio original dungeons-and-dragons. Main sigue separada; no se ha publicado esta entrega.
 
-## Disponible actualmente
+## Implementado
 
-Aplicación 0.3.0: aventura narrativa libre en español, imágenes condicionadas al cambio visual, pregunta integrada en el texto narrado, voz natural y del dispositivo, controles, guardado local, diseño adaptable y PWA con lectura offline. No implementa todavía reglas SRD, fichas, tiradas ni creación de personaje.
+- Creación editable de nivel 1: cuatro clases, cuatro especies, cuatro trasfondos, atributos, habilidades/pericia, dotes, magia, equipo e idiomas. Revisión obligatoria antes de iniciar; 64 combinaciones recomendadas válidas.
+- Motor SRD 5.2.1 del catálogo reducido: d20, ventaja/desventaja, armas/maestrías, magia, concentración, economía de acciones, recursos, daño, curación, muerte y descansos. No pretende ser un simulador de todo el SRD.
+- Aventura original de cinco lugares con acciones libres y objetivos: ruta social/sigilo/combate; victoria completa/parcial, fracaso, retirada y muerte. Escapar del encuentro conserva la misión y cuenta movimiento/reacciones.
+- Autoridad del servidor: cookie privada, SQLite, control de versiones, comandos idempotentes, trabajos de IA y proyección sin secretos. Copias cifradas ligadas a la clave de instalación.
+- Mesa de escritorio y móvil, ilustración permanente, ficha/inventario/magia, dados animados con resultados reales, menú de tres puntos e instalación PWA. Proyección/imagen de lectura offline y borrador separado; historial 0.3 preservado como archivo.
+- Narración automática tras inicio, iconos, pausas/repetición, voz/velocidad/volumen y resaltado aproximado. Dictado mantener/soltar, transcripción en vivo donde existe o grabada al soltar; revisión y envío explícito, nunca automático.
+- Documentación funcional, reglas, catálogo, arquitectura, pruebas, despliegue y agentes. Grafo estructural de código y memoria Engram.
 
-Rama creada para el nuevo trabajo: `develop`. `main` no se ha integrado ni desplegado durante esta fase.
+## Verificación
 
-## Acordado con el usuario
+- Unitarias: **133 correctas**, incluidas reglas, magia, aventuras, SQLite, API, copias, reintentos, controlador de dictado y seguimiento.
+- Tipos, lint y build de producción correctos.
+- E2E: **24 recorridos correctos**, incluidos finales de aventura, recuperación, voz/dictado y PWA.
+- Auditoría npm: cero vulnerabilidades conocidas en el lockfile comprobado.
+- Navegador: Brave/Chromium aislado, build de producción, API/SQLite reales y proveedor simulado local. RNG controlado únicamente por código de pruebas. Móvil a 320/390/768 px, sin overflow horizontal; capturas de creador y mesa revisadas.
+- Revisión independiente: cuatro hallazgos importantes reproducidos y corregidos con regresiones; última revisión focal 37/37 y veredicto sin bloqueos importantes. Incluye consumo de pociones, concentración de trampa, reacciones de enemigos incapacitados y escape del encuentro. También se corrigieron recuperación estable, reintento de prosa y superposición de controles.
+- Master real: una intención de examinar mapa produjo un plan válido; se precisaron ejemplos de kind tras detectar salida con type. No se ejecutaron campañas reales completas en cada prueba.
+- Voz real: Aura española, muestra 28.224 bytes/4,704 s decodificada en navegador y transcrita por Whisper. La transcripción fue inteligible pero tuvo errores de palabras; se mantiene revisión manual. No equivale a probar un micrófono físico.
 
-- SRD 5.2.1 español, cuatro clases iniciales de nivel 1.
-- Primero aventura preparada con acciones libres; posteriormente mundo abierto elegible.
-- Un jugador ahora; arquitectura preparada para varios.
-- El resto de la petición de interfaz, voz, dictado, personaje y documentación está recogido en la especificación.
+## Limitaciones y pendientes explícitos
 
-## Completado en esta fase de diseño
+- Mundo abierto, multijugador conectado, cuentas, niveles superiores, otras clases y catálogo completo todavía no habilitados.
+- No se han probado micrófonos/permisos ni instalación física en Android/iOS. Las simulaciones prueban cancelaciones y contratos, no hardware.
+- La voz natural no trae timestamps por palabra. El resaltado es estimado; las voces del sistema y las políticas de reproducción varían por dispositivo.
+- Cuota de IA compartida y limitada; no uso ilimitado. La aplicación no activa planes de pago ni un proveedor de pago alternativo.
+- PWA necesita HTTPS accesible y backend activo. Offline solo lectura/borrador. La publicación en móvil real es el siguiente paso de infraestructura, no está realizada.
+- SQLite requiere disco persistente y una instancia. Antes de exposición pública se necesitan autenticación y límites compartidos; la cookie anónima no es un sistema de cuentas.
+- La copia descargada requiere la misma `.data/save-key`. Respaldar toda `.data` para migración.
+- El grafo es estructural: 470 nodos/1615 relaciones, con 1 extremo no resuelto, 4 relaciones combinadas y 2 autollamadas documentadas en GRAPH_HEALTH.md. No certifica corrección del programa ni extracción semántica de la documentación.
 
-- Investigación de reglas oficiales y comprobación del código actual.
-- Especificación funcional, arquitectura propuesta y matriz de pruebas.
-- Consulta del grafo previo (160 nodos), contrastado con código porque no refleja por completo la versión actual.
-- Acuerdos de alcance guardados en Engram.
-- 19 pruebas unitarias del producto existente ejecutadas: 19 correctas.
-- Revisión de construcción independiente: se precisó cómo improvisar hechos persistentes; quedan a revisión del usuario las limitaciones de sincronización/dictado y demás propuestas enumeradas.
+## Próximas etapas
 
-## Aprobación y ejecución
-
-- Diseño y catálogo aprobados expresamente por el usuario, incluidos seguimiento aproximado y dictado al soltar.
-- Confirmados cuatro especies, magia acotada, combate sin tablero y aventura original.
-- Plan creado: ../superpowers/plans/2026-11-05-srd-mvp.md. Ejecución nativa en develop.
-
-## Etapas aún no implementadas
-
-Motor SRD y creación; repositorio de sesión; módulo de aventura; mesa nueva y dados; dictado; nueva narración automática con resaltado; E2E de partida completa; integración y despliegue. No marcarlas terminadas por la existencia de estos documentos.
-
-## Motor implementado en develop (todavía sin mesa nueva)
-
-Tareas 1 a 4: creación y catálogo; dados, daño, muerte y descansos; armas/conjuros/condiciones; sesión de aventura con misión, caminos alternativos y finales. El motor tiene pruebas de ruta social, sigilo y combate, botín único, inspiración, azar persistible por grupos y proyección sin secretos. Incluye tipos de participantes y orden de iniciativa para futuras salas, sin multijugador conectado.
-
-Verificación actual: 97 pruebas unitarias correctas, tipos y lint. La interfaz y servidor siguen en la base 0.3.0 hasta conectar las tareas siguientes. Pendientes: persistencia HTTP/SQLite, Master, creador y mesa visual, controles nuevos de voz/dictado y E2E de producto.
-
-Tarea 5: repositorio SQLite, sesión privada por cookie, control de versiones y comandos idempotentes implementados. Exportación cifrada/importación privada ligada a la clave de instalación. Las rutas nuevas todavía no están conectadas a la mesa. Las siguientes tareas son Master y medios autorizados, creador y mesa, voz/dictado, verificación de producto.
-
-Tarea 6: Master separado en interpretación/prosa, arrendamientos persistidos para reintentos, contexto acotado y operaciones validadas. Rutas de imagen/voz por IDs autorizados; transcripción WAV de hasta45s solo devuelve borrador.115 unitarias correctas, tipos/lint/build. Comprobación real: examinar mapa devuelve interact/inspect válido tras precisar kind del plan en el prompt. UI nueva todavía pendiente.
-
-Tarea7: creador/revisión, propuestas válidas para64 combinaciones, mesa de escritorio/móvil, ficha/inventario/magia, dados reales animados, menú/PWA/copias y lectura offline implementados.118 unitarias y9E2E de campaña/recuperación/creación/móvil correctos. Capturas revisadas; ficha desplazable y chat con comienzo del mensaje visible. Rutas de generación0.3 retiradas(410). Voz nueva automática/resaltado/dictado aún esT8; sus E2E previos se adaptarán entonces. No publicar como versión final hastaT9.
-
-Tarea8: narración automática tras inicio explícito, ajustes persistidos, controles con iconos, progreso por reloj o boundary, énfasis sin relayout. Dictado en vivo o grabación al soltar,45s, revisión/envío manual.124 unitarias y17E2E correctos; tipos/build. Muestra real Aura española28.224bytes/4,704s decodificada y transcrita por Whisper; la transcripción tuvo errores de palabras, de ahí la revisión obligatoria. Micrófonos físicos Android/iOS no probados. Queda revisión integralT9.
+Primero probar esta versión con el usuario en equipos reales y decidir alojamiento HTTPS/disco/acceso. Después integrar la versión verificada en main y publicar según ese entorno. Multijugador y mundo abierto requieren sus contratos y pruebas, manteniendo el motor como autoridad.

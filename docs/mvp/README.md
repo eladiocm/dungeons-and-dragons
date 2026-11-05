@@ -1,14 +1,17 @@
-# Diseño del MVP de aventura SRD
+# Documentación del MVP
 
-Esta carpeta contiene la primera etapa del cambio solicitado: investigación, especificación y criterios verificables. **El nuevo juego todavía no está implementado.**
+Versión 0.4.0 en develop: creación, motor SRD, aventura, persistencia privada, mesa adaptable, dados, voz, dictado con revisión y PWA. El alcance y sus limitaciones fueron aprobados por el usuario. Estado y evidencia final en ESTADO.md.
 
-1. [Especificación funcional y decisiones a revisar](../superpowers/specs/2026-11-05-mvp-srd-design.md).
-2. [Reglas, personajes y catálogo propuesto](REGLAS.md).
-3. [Arquitectura, sesiones y autoridad del motor](ARQUITECTURA.md).
-4. [Pruebas y condiciones de aceptación](PRUEBAS.md).
-5. [Estado real y siguientes etapas](ESTADO.md).
-6. [Guía para agentes que se añade a AGENTS.md](../../AGENTS.md).
+1. [Cómo ejecutar y jugar](../../README.md).
+2. [Especificación aprobada](../superpowers/specs/2026-11-05-mvp-srd-design.md).
+3. [Reglas e investigación oficial](REGLAS.md).
+4. [Catálogo implementado](CATALOGO.md).
+5. [Arquitectura y contratos](ARQUITECTURA.md).
+6. [Diseño de la mesa](DISENO.md).
+7. [Pruebas y evidencia](PRUEBAS.md).
+8. [Estado y pendientes](ESTADO.md).
+9. [Despliegue](DESPLIEGUE.md).
+10. [Guía para agentes](../../AGENTS.md).
+11. [Grafo de código](../../graphify-out/GRAPH_REPORT.md), con advertencias de extracción en GRAPH_HEALTH.md.
 
-El usuario ya eligió SRD 5.2.1 español, nivel 1 y cuatro clases; aventura preparada primero y mundo abierto en una segunda etapa. El diseño propone las demás elecciones y las identifica para revisión.
-
-El proyecto ejecutable sigue en la carpeta original `dungeons-and-dragons`, ahora en rama `develop`. Los comandos de ejecución actuales permanecen en su README. Mantener claves en `.env.local`, fuera de documentación y de Git.
+Mundo abierto, multijugador conectado, niveles superiores y catálogo completo todavía no están habilitados. No atribuir esas funciones a esta versión por tener tipos preparados para ellas.

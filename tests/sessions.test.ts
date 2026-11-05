@@ -365,3 +365,76 @@ test('maximum command IDs remain valid when embedded in pending IDs', async () =
     store.close();
   }
 });
+
+test('sync after an ending remains a legal versioned command without another ending event', () => {
+  const store = new SessionStore(':memory:');
+  const service = new GameService(store);
+  try {
+    const { session } = service.create(
+        'owner',
+        'end',
+        suggestCharacter('fighter'),
+      ),
+      actorId = session.participants[0].characterId;
+    const ended = service.execute('owner', session.id, 0, {
+      type: 'propose',
+      id: 'retreat',
+      actorId,
+      text: 'Abandono la misión',
+      plan: { kind: 'retreat' },
+    }).session;
+    const synced = service.execute('owner', session.id, ended.version, {
+      type: 'sync',
+      id: 'sync',
+      actorId,
+    }).session;
+    assert.equal(synced.version, ended.version + 1);
+    assert.equal(synced.events.length, ended.events.length);
+    assert.equal(synced.ending?.kind, 'retreat');
+  } finally {
+    store.close();
+  }
+});
+
+test('reopening SQLite replays a previously rolled command without new randomness', () => {
+  const dir = temp();
+  let store = new SessionStore(dir.file);
+  try {
+    store.create('owner', 'create', 'hash', prep);
+    let service = new GameService(store, () => 15);
+    let state = service.get('owner', 'session');
+    state = service.execute('owner', 'session', state.version, {
+      type: 'propose',
+      id: 'propose',
+      actorId: 'hero',
+      text: 'Convenzo a Bram',
+      plan: { kind: 'interact', targetId: 'bram', method: 'persuade' },
+    }).session;
+    assert.ok(state.pending);
+    const beforeVersion = state.version,
+      command = {
+        type: 'roll' as const,
+        id: 'roll',
+        actorId: 'hero',
+        pendingId: state.pending.id,
+      },
+      rolled = service.execute(
+        'owner',
+        'session',
+        beforeVersion,
+        command,
+      ).session;
+    store.close();
+    store = new SessionStore(dir.file);
+    service = new GameService(store, () => {
+      throw new Error('RNG repeated after restart');
+    });
+    const replay = service.execute('owner', 'session', beforeVersion, command);
+    assert.equal(replay.replayed, true);
+    assert.deepEqual(replay.session.pending?.dice, rolled.pending?.dice);
+    assert.equal(replay.session.version, rolled.version);
+  } finally {
+    store.close();
+    dir.cleanup();
+  }
+});

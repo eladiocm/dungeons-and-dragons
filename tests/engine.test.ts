@@ -5,6 +5,7 @@ import { newBudget } from '../src/game/combat.ts';
 import { publicSession, startSession, transition } from '../src/game/engine.ts';
 import { applyDamage } from '../src/game/rules.ts';
 import type { ActionPlan, GameSession } from '../src/game/session-types.ts';
+import { setScene } from '../src/game/session-utils.ts';
 
 const sequence = (...values: number[]) => {
   let i = 0;
@@ -672,4 +673,136 @@ test('lighting one equipped item in a stack transfers equipment to that single o
   assert.ok(
     stacks.find((i) => i.equipped)?.conditions?.some((c) => c.id === 'light'),
   );
+});
+
+test('drinking a potion heals and permanently consumes one item from the same character', () => {
+  let state = initial();
+  state.battle.actors.hero.hp.current = 1;
+  state = finish(act(state, { kind: 'item', itemId: 'healing-potion' }), 1, 1);
+  const hero = state.battle.actors.hero;
+  assert.ok('inventory' in hero);
+  assert.equal(hero.hp.current, 5);
+  assert.equal(
+    hero.inventory.find((i) => i.catalogId === 'healing-potion')?.quantity,
+    1,
+  );
+  state = finish(act(state, { kind: 'item', itemId: 'healing-potion' }), 1, 1);
+  const after = state.battle.actors.hero;
+  assert.ok('inventory' in after);
+  assert.equal(
+    after.inventory.find((i) => i.catalogId === 'healing-potion')?.quantity,
+    0,
+  );
+  assert.throws(() => act(state, { kind: 'item', itemId: 'healing-potion' }));
+});
+test('damage from the lens mechanism requires a concentration save like combat damage', () => {
+  let state = startSession(
+    'mage',
+    'person',
+    createCharacter(suggestCharacter('wizard'), 'hero'),
+  );
+  state = act(state, {
+    kind: 'cast',
+    spellId: 'detectMagic',
+    targetIds: ['hero'],
+    options: { ritual: true },
+  });
+  setScene(state, 'chamber');
+  state = finish(
+    act(state, { kind: 'interact', targetId: 'lens', method: 'take' }),
+    1,
+    2,
+    1,
+  );
+  assert.equal(state.battle.actors.hero.hp.current, 6);
+  assert.ok(
+    !state.battle.actors.hero.conditions.some((c) => c.id === 'concentrating'),
+  );
+  assert.equal(state.events.at(-1)?.rolls.length, 3);
+});
+test('an incapacitated guard cannot prevent movement by an impossible opportunity reaction', () => {
+  const state = initial();
+  setScene(state, 'mill');
+  state.battle.inCombat = true;
+  state.battle.activeId = 'hero';
+  state.battle.actors.bram.conditions.push({
+    id: 'incapacitated',
+    source: 'sleep',
+  });
+  state.world.npcDisposition.bram = 'hostile';
+  state.battle.positions.hero = { x: 1.5, y: 0 };
+  state.battle.positions.bram = { x: 3, y: 0 };
+  const after = act(state, { kind: 'move', x: -3, y: 0 });
+  assert.equal(after.battle.positions.hero.x, -3);
+  assert.equal(after.battle.actors.hero.hp.current, 12);
+  assert.equal(after.battle.budgets.bram.reaction, true);
+});
+
+test('escaping Bram uses movement and his reaction but preserves the ongoing mission', () => {
+  let state = initial();
+  setScene(state, 'mill');
+  state.battle.inCombat = true;
+  state.battle.activeId = 'hero';
+  state.world.npcDisposition.bram = 'hostile';
+  state.battle.positions.hero = { x: 1.5, y: 0 };
+  state.battle.positions.bram = { x: 3, y: 0 };
+  state = finish(act(state, { kind: 'escape', destination: 'road' }), 15, 2);
+  assert.equal(state.world.sceneId, 'road');
+  assert.equal(state.status, 'active');
+  assert.equal(state.battle.inCombat, false);
+  assert.equal(state.battle.actors.hero.hp.current, 9);
+  assert.equal(state.battle.budgets.bram.reaction, false);
+  assert.equal(state.ending, undefined);
+});
+test('Disengage permits an escape without opportunity damage and cannot persist across ten minutes of travel', () => {
+  let state = initial();
+  setScene(state, 'mill');
+  state.battle.inCombat = true;
+  state.battle.activeId = 'hero';
+  state.world.npcDisposition.bram = 'hostile';
+  state.battle.positions.hero = { x: 1.5, y: 0 };
+  state.battle.positions.bram = { x: 3, y: 0 };
+  state = act(state, { kind: 'maneuver', maneuver: 'disengage' });
+  state = act(state, { kind: 'escape', destination: 'road' });
+  assert.equal(state.battle.actors.hero.hp.current, 12);
+  assert.equal(state.status, 'active');
+  assert.ok(
+    !state.battle.actors.hero.conditions.some((c) => c.id === 'disengaging'),
+  );
+});
+test('Bram stops combat with a fallen sole hero before stable recovery advances hours', () => {
+  let state = initial();
+  setScene(state, 'mill');
+  state.battle.inCombat = true;
+  state.battle.activeId = 'hero';
+  state.world.npcDisposition.bram = 'hostile';
+  state.battle.actors.hero.hp.current = 0;
+  state.battle.actors.hero.conditions.push({
+    id: 'unconscious',
+    source: 'dying',
+  });
+  state.battle.actors.hero.deathSaves = {
+    successes: 3,
+    failures: 0,
+    stable: true,
+  };
+  state = finish(act(state, { kind: 'death' }), 1);
+  assert.equal(state.battle.inCombat, false);
+  assert.equal(state.world.npcDisposition.bram, 'neutral');
+  assert.equal(state.battle.actors.hero.hp.current, 1);
+  assert.equal(state.world.time, 600);
+  assert.equal(state.status, 'active');
+});
+
+test('escape advances away when Bram is still adjacent at the road exit', () => {
+  let state = initial();
+  setScene(state, 'mill');
+  state.battle.inCombat = true;
+  state.battle.activeId = 'hero';
+  state.world.npcDisposition.bram = 'hostile';
+  state.battle.positions.hero = { x: -6, y: 0 };
+  state.battle.positions.bram = { x: -4.5, y: 0 };
+  state = finish(act(state, { kind: 'escape', destination: 'road' }), 15, 2);
+  assert.equal(state.world.sceneId, 'road');
+  assert.equal(state.status, 'active');
 });

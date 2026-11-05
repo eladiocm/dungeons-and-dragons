@@ -14,3 +14,10 @@ test-results/
 .DS_Store
 .superpowers/
 .data/
+
+# Graphify local cache and machine paths; keep only public navigation artifacts.
+graphify-out/.*
+graphify-out/manifest.json
+graphify-out/graphify-out/
+src/graphify-out/
+graphify-out/cache/

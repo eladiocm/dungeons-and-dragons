@@ -255,6 +255,32 @@ export function useCampaign() {
       .then((result) => setSaves(result.sessions))
       .catch(() => {});
   };
+  const retryNarrative = async () => {
+    const current = stateRef.current,
+      message = current?.messages.findLast(
+        (m) => m.role === 'assistant' && m.narrationPending,
+      );
+    if (!current || !message || lock.current) return;
+    lock.current = true;
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await api(`/api/sessions/${current.id}/narrative`, {
+        messageId: message.id,
+      });
+      adopt(result.session);
+      setNotice(result.warning || null);
+    } catch (e) {
+      setNotice(
+        e instanceof Error
+          ? e.message
+          : 'La prosa sigue pendiente. Los resultados están guardados.',
+      );
+    } finally {
+      lock.current = false;
+      setBusy(false);
+    }
+  };
   return {
     session,
     saves,
@@ -274,6 +300,7 @@ export function useCampaign() {
     resume,
     newGame,
     refresh,
+    retryNarrative,
     retry: () => {
       if (retryOp.current) void perform(retryOp.current);
     },

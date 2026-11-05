@@ -12,9 +12,13 @@ export async function quiet(page: Page, imagesEnabled = false) {
     ),
   );
 }
-export async function create(page: Page) {
+export async function create(page: Page, className = '') {
   await page.goto('/');
   await page.getByRole('button', { name: 'Crear personaje' }).click();
+  if (className)
+    await page
+      .getByRole('button', { name: new RegExp(`^${className}`) })
+      .click();
   await page.getByRole('button', { name: 'Continuar' }).click();
   await page.getByRole('button', { name: 'Continuar' }).click();
   await page.getByRole('button', { name: 'Revisar personaje' }).click();

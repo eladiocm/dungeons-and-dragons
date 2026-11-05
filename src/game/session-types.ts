@@ -46,6 +46,7 @@ export type WorldOperation =
   | { type: 'loot'; targetId: string };
 export type ActionPlan =
   | { kind: 'travel'; destination: SceneId }
+  | { kind: 'escape'; destination: SceneId }
   | {
       kind: 'interact';
       targetId: string;
