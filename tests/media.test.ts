@@ -15,10 +15,8 @@ test('scene and speech use authorized IDs and reject raw prompts or text without
   const service = new GameService(store),
     token = 'a'.repeat(43),
     owner = createHash('sha256').update(token).digest('hex');
-  const state = service.create(
-    owner,
-    'create',
-    suggestCharacter('fighter'),
+  const state = (
+    await service.create(owner, 'create', suggestCharacter('fighter'))
   ).session;
   const api = createMediaApi(service, {
     image: async (prompt) => {

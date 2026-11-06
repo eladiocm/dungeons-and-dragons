@@ -6,17 +6,17 @@ import { getHero } from '../game/session-utils.ts';
 import { type Roller, RuleError } from '../game/types.ts';
 import type { Master } from './master.ts';
 import type { SaveCodec } from './save-codec.ts';
-import type { SessionStore } from './session-store.ts';
+import type { SessionRepository } from './session-repository.ts';
 
 export const hashPayload = (value: unknown) =>
   createHash('sha256').update(JSON.stringify(value)).digest('hex');
 export class GameService {
-  readonly store: SessionStore;
+  readonly store: SessionRepository;
   private readonly roller: Roller;
   private readonly codec?: SaveCodec;
   private readonly master?: Master;
   constructor(
-    store: SessionStore,
+    store: SessionRepository,
     roller: Roller = (sides) => randomInt(1, sides + 1),
     codec?: SaveCodec,
     master?: Master,
@@ -26,20 +26,20 @@ export class GameService {
     this.codec = codec;
     this.master = master;
   }
-  list(owner: string) {
-    return this.store.list(owner);
+  async list(owner: string) {
+    return await this.store.list(owner);
   }
-  get(owner: string, id: string) {
-    return publicSession(this.store.read(owner, id));
+  async get(owner: string, id: string) {
+    return publicSession(await this.store.read(owner, id));
   }
-  create(owner: string, creationId: string, draft: unknown) {
+  async create(owner: string, creationId: string, draft: unknown) {
     if (
       typeof creationId !== 'string' ||
       !creationId.trim() ||
       creationId.length > 100
     )
       throw new RuleError('Identificador de creación inválido.');
-    const result = this.store.create(
+    const result = await this.store.create(
       owner,
       creationId,
       hashPayload(draft),
@@ -52,7 +52,7 @@ export class GameService {
     );
     return { session: publicSession(result.state), replayed: result.replayed };
   }
-  execute(
+  async execute(
     owner: string,
     id: string,
     expectedVersion: number,
@@ -62,7 +62,7 @@ export class GameService {
       throw new RuleError(
         'Describe esa acción en el chat para que el Master la interprete.',
       );
-    const result = this.store.transact(
+    const result = await this.store.transact(
       owner,
       id,
       expectedVersion,
@@ -72,10 +72,10 @@ export class GameService {
     );
     return { session: publicSession(result.state), replayed: result.replayed };
   }
-  export(owner: string, id: string) {
+  async export(owner: string, id: string) {
     if (!this.codec)
       throw new RuleError('Las copias no están configuradas.', 503);
-    return this.codec.seal(this.store.read(owner, id));
+    return this.codec.seal(await this.store.read(owner, id));
   }
   async intent(
     owner: string,
@@ -84,9 +84,9 @@ export class GameService {
     input: { id: string; actorId: string; text: string },
   ) {
     const hash = hashPayload({ expectedVersion, input }),
-      replay = this.store.replay(owner, id, input.id, hash);
+      replay = await this.store.replay(owner, id, input.id, hash);
     if (replay) return { session: publicSession(replay), replayed: true };
-    const state = this.store.read(owner, id);
+    const state = await this.store.read(owner, id);
     getHero(state, input.actorId);
     if (state.version !== expectedVersion)
       throw new RuleError(
@@ -100,10 +100,10 @@ export class GameService {
     if (!this.master)
       throw new RuleError('El Master no está configurado.', 503);
     const key = `intent:${input.id}`,
-      job = this.store.claim(owner, id, key, hash);
+      job = await this.store.claim(owner, id, key, hash);
     if (job.cached)
       return {
-        session: this.get(owner, id),
+        session: await this.get(owner, id),
         replayed: true,
         clarification: JSON.parse(job.cached).clarification as
           | string
@@ -116,18 +116,18 @@ export class GameService {
         input.text,
       );
       if (proposal.kind === 'clarify') {
-        this.store.finishJob(
+        await this.store.finishJob(
           id,
           key,
           JSON.stringify({ clarification: proposal.question }),
         );
         return {
-          session: this.get(owner, id),
+          session: await this.get(owner, id),
           replayed: false,
           clarification: proposal.question,
         };
       }
-      const result = this.store.transact(
+      const result = await this.store.transact(
         owner,
         id,
         expectedVersion,
@@ -140,13 +140,13 @@ export class GameService {
             this.roller,
           ),
       );
-      this.store.finishJob(id, key, '{}');
+      await this.store.finishJob(id, key, '{}');
       return {
         session: publicSession(result.state),
         replayed: result.replayed,
       };
     } catch (error) {
-      this.store.releaseJob(id, key);
+      await this.store.releaseJob(id, key);
       throw error;
     }
   }
@@ -155,7 +155,7 @@ export class GameService {
     id: string,
     messageId: string,
   ): Promise<{ session: ReturnType<typeof publicSession>; warning?: string }> {
-    const state = this.store.read(owner, id),
+    const state = await this.store.read(owner, id),
       message = state.messages.find(
         (m) => m.id === messageId && m.role === 'assistant',
       );
@@ -168,25 +168,25 @@ export class GameService {
           'La narración está pendiente. Los resultados ya están guardados.',
       };
     const key = `narration:${messageId}`;
-    this.store.claim(owner, id, key, hashPayload(messageId));
+    await this.store.claim(owner, id, key, hashPayload(messageId));
     try {
       const content = await this.master.narrate(state, message),
-        next = this.store.amendNarration(owner, id, messageId, content);
-      this.store.finishJob(id, key, '{}');
+        next = await this.store.amendNarration(owner, id, messageId, content);
+      await this.store.finishJob(id, key, '{}');
       return { session: publicSession(next) };
     } catch {
-      this.store.releaseJob(id, key);
+      await this.store.releaseJob(id, key);
       return {
-        session: this.get(owner, id),
+        session: await this.get(owner, id),
         warning:
           'No se pudo ampliar la narración. Los hechos y resultados se han conservado; puedes reintentar.',
       };
     }
   }
-  import(owner: string, creationId: string, save: unknown) {
+  async import(owner: string, creationId: string, save: unknown) {
     if (!this.codec)
       throw new RuleError('Las copias no están configuradas.', 503);
-    const result = this.store.create(
+    const result = await this.store.create(
       owner,
       creationId,
       hashPayload(save),

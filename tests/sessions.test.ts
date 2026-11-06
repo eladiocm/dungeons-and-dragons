@@ -53,7 +53,7 @@ function temp() {
   };
 }
 
-test('SQLite sessions survive reopening and another owner cannot read them', () => {
+test('SQLite sessions survive reopening and another owner cannot read them', async () => {
   const dir = temp();
   let store = new SessionStore(dir.file);
   try {
@@ -73,7 +73,7 @@ test('SQLite sessions survive reopening and another owner cannot read them', () 
   }
 });
 
-test('duplicate creation is idempotent and a changed payload with the same key is rejected', () => {
+test('duplicate creation is idempotent and a changed payload with the same key is rejected', async () => {
   const store = new SessionStore(':memory:');
   try {
     const first = store.create('owner', 'create', 'hash', initial);
@@ -91,7 +91,7 @@ test('duplicate creation is idempotent and a changed payload with the same key i
   }
 });
 
-test('a lost roll response is replayed without invoking RNG again', () => {
+test('a lost roll response is replayed without invoking RNG again', async () => {
   const store = new SessionStore(':memory:');
   try {
     store.create('owner', 'create', 'hash', prep);
@@ -155,7 +155,7 @@ test('a lost roll response is replayed without invoking RNG again', () => {
   }
 });
 
-test('two stale writers cannot overwrite one another and failed transitions roll back', () => {
+test('two stale writers cannot overwrite one another and failed transitions roll back', async () => {
   const store = new SessionStore(':memory:');
   try {
     store.create('owner', 'create', 'hash', initial);
@@ -366,28 +366,32 @@ test('maximum command IDs remain valid when embedded in pending IDs', async () =
   }
 });
 
-test('sync after an ending remains a legal versioned command without another ending event', () => {
+test('sync after an ending remains a legal versioned command without another ending event', async () => {
   const store = new SessionStore(':memory:');
   const service = new GameService(store);
   try {
-    const { session } = service.create(
+    const { session } = await service.create(
         'owner',
         'end',
         suggestCharacter('fighter'),
       ),
       actorId = session.participants[0].characterId;
-    const ended = service.execute('owner', session.id, 0, {
-      type: 'propose',
-      id: 'retreat',
-      actorId,
-      text: 'Abandono la misión',
-      plan: { kind: 'retreat' },
-    }).session;
-    const synced = service.execute('owner', session.id, ended.version, {
-      type: 'sync',
-      id: 'sync',
-      actorId,
-    }).session;
+    const ended = (
+      await service.execute('owner', session.id, 0, {
+        type: 'propose',
+        id: 'retreat',
+        actorId,
+        text: 'Abandono la misión',
+        plan: { kind: 'retreat' },
+      })
+    ).session;
+    const synced = (
+      await service.execute('owner', session.id, ended.version, {
+        type: 'sync',
+        id: 'sync',
+        actorId,
+      })
+    ).session;
     assert.equal(synced.version, ended.version + 1);
     assert.equal(synced.events.length, ended.events.length);
     assert.equal(synced.ending?.kind, 'retreat');
@@ -396,20 +400,22 @@ test('sync after an ending remains a legal versioned command without another end
   }
 });
 
-test('reopening SQLite replays a previously rolled command without new randomness', () => {
+test('reopening SQLite replays a previously rolled command without new randomness', async () => {
   const dir = temp();
   let store = new SessionStore(dir.file);
   try {
     store.create('owner', 'create', 'hash', prep);
     let service = new GameService(store, () => 15);
-    let state = service.get('owner', 'session');
-    state = service.execute('owner', 'session', state.version, {
-      type: 'propose',
-      id: 'propose',
-      actorId: 'hero',
-      text: 'Convenzo a Bram',
-      plan: { kind: 'interact', targetId: 'bram', method: 'persuade' },
-    }).session;
+    let state = await service.get('owner', 'session');
+    state = (
+      await service.execute('owner', 'session', state.version, {
+        type: 'propose',
+        id: 'propose',
+        actorId: 'hero',
+        text: 'Convenzo a Bram',
+        plan: { kind: 'interact', targetId: 'bram', method: 'persuade' },
+      })
+    ).session;
     assert.ok(state.pending);
     const beforeVersion = state.version,
       command = {
@@ -418,18 +424,20 @@ test('reopening SQLite replays a previously rolled command without new randomnes
         actorId: 'hero',
         pendingId: state.pending.id,
       },
-      rolled = service.execute(
-        'owner',
-        'session',
-        beforeVersion,
-        command,
+      rolled = (
+        await service.execute('owner', 'session', beforeVersion, command)
       ).session;
     store.close();
     store = new SessionStore(dir.file);
     service = new GameService(store, () => {
       throw new Error('RNG repeated after restart');
     });
-    const replay = service.execute('owner', 'session', beforeVersion, command);
+    const replay = await service.execute(
+      'owner',
+      'session',
+      beforeVersion,
+      command,
+    );
     assert.equal(replay.replayed, true);
     assert.deepEqual(replay.session.pending?.dice, rolled.pending?.dice);
     assert.equal(replay.session.version, rolled.version);

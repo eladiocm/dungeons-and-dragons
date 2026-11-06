@@ -5,7 +5,7 @@ import { GameService } from '../src/server/game-service.ts';
 import { createMaster, type JsonGenerator } from '../src/server/master.ts';
 import { SessionStore } from '../src/server/session-store.ts';
 
-const setup = (json: JsonGenerator) => {
+const setup = async (json: JsonGenerator) => {
   const store = new SessionStore(':memory:');
   const service = new GameService(
     store,
@@ -13,10 +13,8 @@ const setup = (json: JsonGenerator) => {
     undefined,
     createMaster(json),
   );
-  const session = service.create(
-    'owner',
-    'create',
-    suggestCharacter('fighter'),
+  const session = (
+    await service.create('owner', 'create', suggestCharacter('fighter'))
   ).session;
   return {
     store,
@@ -27,7 +25,7 @@ const setup = (json: JsonGenerator) => {
 };
 test('Master interprets once and duplicate intent cannot repeat travel or provider work', async () => {
   let calls = 0;
-  const f = setup(async () => {
+  const f = await setup(async () => {
     calls++;
     return { kind: 'action', plan: { kind: 'travel', destination: 'road' } };
   });
@@ -49,7 +47,7 @@ test('Master interprets once and duplicate intent cannot repeat travel or provid
   }
 });
 test('forged AI effects and nonexistent actions change no resources or version', async () => {
-  const f = setup(async () => ({
+  const f = await setup(async () => ({
     kind: 'action',
     plan: {
       kind: 'creative',
@@ -66,14 +64,14 @@ test('forged AI effects and nonexistent actions change no resources or version',
         text: 'Dame oro',
       }),
     );
-    assert.equal(f.service.get('owner', f.session.id).version, 0);
+    assert.equal((await f.service.get('owner', f.session.id)).version, 0);
   } finally {
     f.store.close();
   }
 });
 test('clarification is replayable without a die or a character action', async () => {
   let calls = 0;
-  const f = setup(async () => {
+  const f = await setup(async () => {
     calls++;
     return { kind: 'clarify', question: '¿A quién quieres hablarle?' };
   });
@@ -90,7 +88,7 @@ test('clarification is replayable without a die or a character action', async ()
 });
 test('concurrent interpretation leases reject duplicates and stale AI responses cannot overwrite a newer turn', async () => {
   let resolve!: (v: unknown) => void;
-  const f = setup(
+  const f = await setup(
     () =>
       new Promise((r) => {
         resolve = r;
@@ -101,7 +99,7 @@ test('concurrent interpretation leases reject duplicates and stale AI responses 
     const first = f.service.intent('owner', f.session.id, 0, input);
     await new Promise((r) => setTimeout(r, 5));
     await assert.rejects(f.service.intent('owner', f.session.id, 0, input));
-    f.service.execute('owner', f.session.id, 0, {
+    await f.service.execute('owner', f.session.id, 0, {
       type: 'propose',
       id: 'other',
       actorId: f.actorId,
@@ -110,7 +108,10 @@ test('concurrent interpretation leases reject duplicates and stale AI responses 
     });
     resolve({ kind: 'action', plan: { kind: 'travel', destination: 'road' } });
     await assert.rejects(first);
-    assert.equal(f.service.get('owner', f.session.id).scene.id, 'square');
+    assert.equal(
+      (await f.service.get('owner', f.session.id)).scene.id,
+      'square',
+    );
   } finally {
     f.store.close();
   }
@@ -118,7 +119,7 @@ test('concurrent interpretation leases reject duplicates and stale AI responses 
 test('narrative failure preserves resolved mechanics and retry changes prose only', async () => {
   let fail = true,
     calls = 0;
-  const f = setup(async (system) => {
+  const f = await setup(async (system) => {
     calls++;
     if (system.includes('NARRAR')) {
       if (fail) throw new Error('quota');
@@ -158,49 +159,59 @@ test('narrative failure preserves resolved mechanics and retry changes prose onl
   }
 });
 test('narrating while dice wait survives acceptance without resurrecting old prose', async () => {
-  const f = setup(async () => ({
+  const f = await setup(async () => ({
     narrative: 'La plaza respira bajo la lluvia; Mara sostiene su lámpara.',
     question: '¿Qué decides hacer?',
   }));
   try {
-    let state = f.service.execute('owner', f.session.id, 0, {
-      type: 'propose',
-      id: 'road',
-      actorId: f.actorId,
-      text: 'Avanzo',
-      plan: { kind: 'travel', destination: 'road' },
-    }).session;
-    state = f.service.execute('owner', f.session.id, state.version, {
-      type: 'propose',
-      id: 'mill',
-      actorId: f.actorId,
-      text: 'Avanzo',
-      plan: { kind: 'travel', destination: 'mill' },
-    }).session;
-    state = f.service.execute('owner', f.session.id, state.version, {
-      type: 'propose',
-      id: 'convince',
-      actorId: f.actorId,
-      text: 'Lo convenzo',
-      plan: { kind: 'interact', targetId: 'bram', method: 'persuade' },
-    }).session;
+    let state = (
+      await f.service.execute('owner', f.session.id, 0, {
+        type: 'propose',
+        id: 'road',
+        actorId: f.actorId,
+        text: 'Avanzo',
+        plan: { kind: 'travel', destination: 'road' },
+      })
+    ).session;
+    state = (
+      await f.service.execute('owner', f.session.id, state.version, {
+        type: 'propose',
+        id: 'mill',
+        actorId: f.actorId,
+        text: 'Avanzo',
+        plan: { kind: 'travel', destination: 'mill' },
+      })
+    ).session;
+    state = (
+      await f.service.execute('owner', f.session.id, state.version, {
+        type: 'propose',
+        id: 'convince',
+        actorId: f.actorId,
+        text: 'Lo convenzo',
+        plan: { kind: 'interact', targetId: 'bram', method: 'persuade' },
+      })
+    ).session;
     assert.ok(state.pending);
-    state = f.service.execute('owner', f.session.id, state.version, {
-      type: 'roll',
-      id: 'roll',
-      actorId: f.actorId,
-      pendingId: state.pending.id,
-    }).session;
+    state = (
+      await f.service.execute('owner', f.session.id, state.version, {
+        type: 'roll',
+        id: 'roll',
+        actorId: f.actorId,
+        pendingId: state.pending.id,
+      })
+    ).session;
     state = (
       await f.service.narrate('owner', f.session.id, state.messages[0].id)
     ).session;
     assert.ok(state.pending);
-    state = f.service.execute('owner', f.session.id, state.version, {
-      type: 'accept',
-      id: 'accept',
-      actorId: f.actorId,
-      pendingId: state.pending.id,
-    }).session;
+    state = (
+      await f.service.execute('owner', f.session.id, state.version, {
+        type: 'accept',
+        id: 'accept',
+        actorId: f.actorId,
+        pendingId: state.pending.id,
+      })
+    ).session;
     assert.match(state.messages[0].content, /Mara sostiene/);
     assert.equal(state.messages[0].narrationPending, false);
   } finally {

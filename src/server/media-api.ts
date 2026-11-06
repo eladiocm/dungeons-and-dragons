@@ -34,7 +34,7 @@ export function createMediaApi(
       try {
         const raw = fields(await jsonBody(request), ['sceneRevision']),
           identity = owner(request),
-          state = service.get(identity.hash, id);
+          state = await service.get(identity.hash, id);
         if (raw.sceneRevision !== state.world.sceneRevision)
           throw new RuleError(
             'La escena cambió. Actualiza antes de ilustrarla.',
@@ -45,21 +45,21 @@ export function createMediaApi(
             revision: raw.sceneRevision,
             prompt: state.scene.imagePrompt,
           }),
-          cached = service.store.media(key);
+          cached = await service.store.media(key);
         if (cached) return apiResponse({ image: JSON.parse(cached) });
         const job = `image:${key}`;
-        service.store.claim(identity.hash, id, job, key);
+        await service.store.claim(identity.hash, id, job, key);
         try {
           const image = await providers.image(
             state.scene.imagePrompt,
             request.signal,
           );
-          service.store.saveMedia(key, JSON.stringify(image));
+          await service.store.saveMedia(key, JSON.stringify(image));
           // The bounded media cache owns the result; an evicted image may be generated again.
-          service.store.releaseJob(id, job);
+          await service.store.releaseJob(id, job);
           return apiResponse({ image });
         } catch (error) {
-          service.store.releaseJob(id, job);
+          await service.store.releaseJob(id, job);
           throw error;
         }
       } catch (error) {
@@ -73,7 +73,7 @@ export function createMediaApi(
             'chunkIndex',
             'speaker',
           ]),
-          state = service.get(owner(request).hash, id),
+          state = await service.get(owner(request).hash, id),
           message = state.messages.find(
             (m) => m.id === raw.messageId && m.role === 'assistant',
           );
@@ -105,7 +105,7 @@ export function createMediaApi(
     async transcribe(request: Request, id: string) {
       try {
         const raw = fields(await jsonBody(request, 1920300), ['audio']);
-        service.get(owner(request).hash, id);
+        await service.get(owner(request).hash, id);
         return apiResponse({
           text: await providers.transcribe(
             validateRecording(raw.audio),

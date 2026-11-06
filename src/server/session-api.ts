@@ -275,7 +275,7 @@ export function createSessionApi(service: GameService) {
         requestOrigin(request);
         const identity = owner(request, true);
         return apiResponse(
-          { sessions: service.list(identity.hash) },
+          { sessions: await service.list(identity.hash) },
           200,
           identity.cookie,
         );
@@ -290,7 +290,11 @@ export function createSessionApi(service: GameService) {
           throw new RuleError('Solicitud de creación inválida.');
         exact(raw, ['id', 'character']);
         const identity = owner(request, true),
-          result = service.create(identity.hash, id(raw.id), raw.character);
+          result = await service.create(
+            identity.hash,
+            id(raw.id),
+            raw.character,
+          );
         return apiResponse(
           result,
           result.replayed ? 200 : 201,
@@ -304,7 +308,7 @@ export function createSessionApi(service: GameService) {
       try {
         requestOrigin(request);
         return apiResponse({
-          session: service.get(owner(request).hash, id(sessionId)),
+          session: await service.get(owner(request).hash, id(sessionId)),
         });
       } catch (error) {
         return apiFailure(error);
@@ -313,7 +317,9 @@ export function createSessionApi(service: GameService) {
     async export(request: Request, sessionId: string) {
       try {
         requestOrigin(request);
-        return apiResponse(service.export(owner(request).hash, id(sessionId)));
+        return apiResponse(
+          await service.export(owner(request).hash, id(sessionId)),
+        );
       } catch (error) {
         return apiFailure(error);
       }
@@ -324,7 +330,7 @@ export function createSessionApi(service: GameService) {
         if (!record(raw)) throw new RuleError('Copia inválida.');
         exact(raw, ['id', 'save']);
         const identity = owner(request, true),
-          result = service.import(identity.hash, id(raw.id), raw.save);
+          result = await service.import(identity.hash, id(raw.id), raw.save);
         return apiResponse(
           result,
           result.replayed ? 200 : 201,
@@ -338,7 +344,7 @@ export function createSessionApi(service: GameService) {
       try {
         const raw = commandBody(await jsonBody(request));
         return apiResponse(
-          service.execute(
+          await service.execute(
             owner(request).hash,
             id(sessionId),
             raw.expectedVersion,
