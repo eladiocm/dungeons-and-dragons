@@ -1,6 +1,6 @@
-# Estado del MVP 0.4.0
+# Estado del MVP 0.4.1
 
-5 de noviembre de 2026. Repositorio original dungeons-and-dragons. Demo integrada en `main` por petición del usuario; se conserva `develop` para desarrollo. No se ha publicado: está pendiente la elección de alojamiento.
+5 de noviembre de 2026. Repositorio original dungeons-and-dragons. Demo integrada en `main` por petición del usuario; se conserva `develop` para desarrollo. Plataforma aprobada: Vercel Hobby + Supabase Free + Cloudflare AI. Persistencia migrada y verificada; publicación en comprobación final.
 
 ## Implementado
 
@@ -14,7 +14,7 @@
 
 ## Verificación
 
-- Unitarias: **133 correctas**, incluidas reglas, magia, aventuras, SQLite, API, copias, reintentos, controlador de dictado y seguimiento.
+- Unitarias: **141 correctas**, incluidas reglas, magia, aventuras, SQLite, API, copias, reintentos, controlador de dictado y seguimiento.
 - Tipos, lint y build de producción correctos.
 - E2E: **27 recorridos correctos**, incluidos finales de aventura, recuperación, voz/dictado y PWA.
 - Auditoría npm: cero vulnerabilidades conocidas en el lockfile comprobado.
@@ -37,3 +37,7 @@
 ## Próximas etapas
 
 Primero probar esta versión con el usuario en equipos reales y decidir alojamiento HTTPS/disco/acceso. La demo ya se integró en main; publicar según el entorno elegido. Multijugador y mundo abierto requieren sus contratos y pruebas, manteniendo el motor como autoridad.
+
+## Release cloud
+
+6 de noviembre: servicio/API async, Supabase remoto transaccional, presupuesto compartido de IA, caché de voz persistida y clave estable de copias. Proyecto y variables cifradas de producción preparados; todavía no se considera publicado hasta verificar el deployment. Revisar secciones cloud de ARQUITECTURA/DESPLIEGUE: las referencias previas a disco/SQLite se conservan para desarrollo local.

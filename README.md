@@ -1,6 +1,6 @@
 # Calabozos y Dragones — La última luz de Valdumbría
 
-MVP 0.4.0 en español para jugar una aventura de fantasía en solitario. Creas un personaje de nivel 1, revisas su ficha y decides cuándo iniciar. El Master interpreta tus acciones libres y narra; el motor aplica las reglas, los dados y los cambios de la partida.
+MVP 0.4.1 en español para jugar una aventura de fantasía en solitario. Creas un personaje de nivel 1, revisas su ficha y decides cuándo iniciar. El Master interpreta tus acciones libres y narra; el motor aplica las reglas, los dados y los cambios de la partida.
 
 Basado en el **SRD 5.2.1**, con un catálogo reducido: guerrero, pícaro, clérigo y mago; humano, enano, mediano y alto elfo; cuatro trasfondos. La aventura original tiene objetivos y desenlaces por victoria, fracaso, retirada o muerte. Mundo abierto y multijugador quedan para otra etapa.
 
@@ -23,7 +23,7 @@ npm run build
 npm start
 ```
 
-Las partidas se guardan automáticamente en SQLite (`.data/game.sqlite`). La carpeta se crea al usar la API; no necesita un servicio de base de datos externo. Se requiere **un servidor Node y disco persistente**. Esta implementación no se exporta como web estática, no corre sin adaptar sobre Edge/Workers y no debe instalarse sobre almacenamiento efímero.
+En desarrollo local, las partidas se guardan automáticamente en SQLite (`.data/game.sqlite`). La carpeta se crea al usar la API; no necesita un servicio de base de datos externo. Se requiere **un servidor Node y disco persistente**. Esta implementación no se exporta como web estática, no corre sin adaptar sobre Edge/Workers y no debe instalarse sobre almacenamiento efímero.
 
 ## IA gratuita y voz
 
@@ -89,7 +89,7 @@ El teléfono necesita una dirección **HTTPS accesible y backend activo**; `loca
 
 ## Desarrollo, pruebas y arquitectura
 
-Trabajo en `develop`; la demo 0.4.0 está integrada en `main`. El alojamiento está pendiente de elección; todavía no se ha publicado. El dominio puro está en `src/game`, persistencia/Master/API en `src/server` y mesa/hooks en `src/app`. No hay motor mecánico alternativo en la prosa de la IA.
+Trabajo en `develop`; la demo 0.4.1 está integrada en `main`. Alojamiento elegido: Vercel Hobby + Supabase Free; configuración y verificación de la URL en docs/mvp/DESPLIEGUE.md. El dominio puro está en `src/game`, persistencia/Master/API en `src/server` y mesa/hooks en `src/app`. No hay motor mecánico alternativo en la prosa de la IA.
 
 ```powershell
 npm test
@@ -106,3 +106,11 @@ Consulta [documentación del MVP](docs/mvp/README.md), [evidencia y límites](do
 ## Atribución
 
 Esta obra incluye material procedente del Documento de Referencia del Sistema 5.2.1 de Wizards of the Coast LLC, disponible en [D&D Beyond](https://www.dndbeyond.com/srd), bajo [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/legalcode). La selección, síntesis y adaptaciones se explican en la documentación. Valdumbría, sus personajes y sus escenas locales son originales. No es un producto oficial de Wizards of the Coast. [Aviso](public/attribution.txt).
+
+## Despliegue gratuito 0.4.1
+
+La versión cloud usa **Vercel Hobby + Supabase Free**, conservando Cloudflare para IA. `GAME_STORE=supabase` activa el repositorio remoto; en Vercel se rechaza SQLite o una configuración incompleta. Las tablas están en un esquema privado; únicamente el backend puede operar mediante RPC con su credencial privada. La clave publicable por sí sola no da acceso a partidas.
+
+Variables de servidor: `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `DND_BACKEND_SECRET`, `SAVE_KEY_BASE64`, `APP_ORIGIN` y las credenciales existentes de Cloudflare. Nunca usar `NEXT_PUBLIC_` para secretos. La cuota compartida de esta demo es inicialmente 100 llamadas IA/día UTC (`DEMO_AI_DAILY_LIMIT`), además de la cuota de Cloudflare. Caché de imagen/voz persistida: 24 entradas de hasta 2 MB. Guardado cloud máximo 2 MB/sesión y límite global de demo; los errores conservan el estado.
+
+No se activan cuentas ni multijugador en esta versión. La cookie pertenece al dominio donde juegas. Los guardados locales se conservan en el PC; para trasladar una partida usa Exportar/Importar con la misma clave de instalación, nunca copies cookies. `.env.cloud.local` es una configuración privada ignorada por Git y usada por `npm run test:integration`, que ejecuta pruebas contra un proyecto Supabase dedicado. Detalles en [despliegue](docs/mvp/DESPLIEGUE.md).

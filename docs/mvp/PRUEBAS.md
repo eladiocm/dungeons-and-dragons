@@ -1,6 +1,6 @@
 # Plan de aceptación y evidencia
 
-Estado 0.4.0: **133 unitarias y 27 E2E correctas**, tipos/lint/build correctos. Esta matriz conserva los criterios de diseño; la evidencia ejecutada y límites se registran en ESTADO.md. Micrófonos/instalación físicos Android/iOS no se consideran probados por usar simulaciones.
+Estado 0.4.0: **141 unitarias y 27 E2E** (comprobación final del release cloud indicada abajo), tipos/lint/build correctos. Esta matriz conserva los criterios de diseño; la evidencia ejecutada y límites se registran en ESTADO.md. Micrófonos/instalación físicos Android/iOS no se consideran probados por usar simulaciones.
 
 ## Principios
 
@@ -86,3 +86,9 @@ Navegador de pruebas: Brave/Chromium firmado, controlado por Playwright; se usa 
 ## Validación para integración de la demo
 
 5 de noviembre de 2026, tras la petición de integrar y desplegar: 133/133 unitarias y 27/27 E2E completas, tipos/lint/build correctos. La primera ejecución de 26 pruebas detectó un evento timeupdate tardío que movía el resaltado después de pausar. Una regresión determinista lo reprodujo (palabra 0→28 mientras estaba pausado); el controlador ahora ignora progreso con audio.paused. La nueva prueba también verifica que el progreso vuelve a funcionar al reanudar. No se ocultó la falla mediante reintentos.
+
+## Migración cloud 0.4.1
+
+137 unitarias iniciales verdes y 27 E2E completas sobre el servicio async. Integración real en Supabase Free: creación idempotente/hashdistinto409, propiedad privada404, dos escritores con una confirmación/CAS409, replay de dado sin nueva aleatoriedad, arrendamientos, enmiendas a pending/base/preview, reabrir repositorio, secreto inválido403, cuota persistida429 y caché. Tipos/lint/build correctos.
+
+Revisión independiente encontró dos carreras: miss de media antes de claim y narración con snapshot pending antiguo/job ya acabado. Cuatro regresiones nuevas se observaron fallar (2 inferencias por medio /1 inferencia de narración innecesaria) y pasan tras recheck bajo claim/cached+relectura.141 unitarias verdes; build/27 E2E repetidas después de los arreglos. No se considera verificado el despliegue hasta comprobar la URL y el flujo remoto. Escaneo del bundle del navegador: ninguna coincidencia de los tres secretos privados actuales.

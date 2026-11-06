@@ -168,9 +168,16 @@ export class GameService {
           'La narración está pendiente. Los resultados ya están guardados.',
       };
     const key = `narration:${messageId}`;
-    await this.store.claim(owner, id, key, hashPayload(messageId));
+    const job = await this.store.claim(owner, id, key, hashPayload(messageId));
+    if (job.cached) return { session: await this.get(owner, id) };
     try {
-      const content = await this.master.narrate(state, message),
+      const latest = await this.store.read(owner, id),
+        latestMessage = latest.messages.find((m) => m.id === messageId);
+      if (!latestMessage?.narrationPending) {
+        await this.store.finishJob(id, key, '{}');
+        return { session: publicSession(latest) };
+      }
+      const content = await this.master.narrate(latest, latestMessage),
         next = await this.store.amendNarration(owner, id, messageId, content);
       await this.store.finishJob(id, key, '{}');
       return { session: publicSession(next) };

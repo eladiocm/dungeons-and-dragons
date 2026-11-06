@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { suggestCharacter } from '../src/game/character.ts';
-import { GameService } from '../src/server/game-service.ts';
+import { GameService, hashPayload } from '../src/server/game-service.ts';
 import { createMaster, type JsonGenerator } from '../src/server/master.ts';
 import { SessionStore } from '../src/server/session-store.ts';
 
@@ -218,3 +218,62 @@ test('narrating while dice wait survives acceptance without resurrecting old pro
     f.store.close();
   }
 });
+
+for (const cachedJob of [false, true]) {
+  test(`stale pending narration respects an already amended message, cached job: ${cachedJob}`, async () => {
+    const store = new SessionStore(':memory:');
+    let calls = 0;
+    const master = createMaster(async () => {
+      calls++;
+      return { narrative: 'Prosa repetida.', question: '¿Qué decides?' };
+    });
+    const service = new GameService(store, () => 15, undefined, master);
+    try {
+      const state = (
+        await service.create('owner', 'create', suggestCharacter('fighter'))
+      ).session;
+      const stale = store.read('owner', state.id),
+        messageId = state.messages[0].id,
+        key = `narration:${messageId}`;
+      const done = store.amendNarration(
+        'owner',
+        state.id,
+        messageId,
+        'Prosa ya completada. ¿Qué decides?',
+      );
+      if (cachedJob) {
+        store.claim('owner', state.id, key, hashPayload(messageId));
+        store.finishJob(state.id, key, '{}');
+      }
+      let first = true;
+      const delayed = new Proxy(store, {
+        get(target, key) {
+          if (key === 'read')
+            return (owner: string, id: string) => {
+              if (first) {
+                first = false;
+                return structuredClone(stale);
+              }
+              return target.read(owner, id);
+            };
+          const value = Reflect.get(target, key);
+          return typeof value === 'function' ? value.bind(target) : value;
+        },
+      });
+      const result = await new GameService(
+        delayed,
+        () => 15,
+        undefined,
+        master,
+      ).narrate('owner', state.id, messageId);
+      assert.equal(calls, 0);
+      assert.equal(result.session.version, done.version);
+      assert.equal(
+        result.session.messages[0].content,
+        done.messages[0].content,
+      );
+    } finally {
+      store.close();
+    }
+  });
+}

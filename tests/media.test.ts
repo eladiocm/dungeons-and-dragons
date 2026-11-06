@@ -161,3 +161,74 @@ test('recording limit comes from actual WAV duration and malformed audio never r
   assert.equal(await transcribe(audio(1)), 'Examino la palanca.');
   assert.equal(calls, 1);
 });
+
+for (const kind of ['image', 'speech'] as const) {
+  test(`a stale ${kind} cache miss is rechecked after claiming the generation`, async () => {
+    const store = new SessionStore(':memory:'),
+      token = 'c'.repeat(43),
+      owner = createHash('sha256').update(token).digest('hex');
+    const service = new GameService(store),
+      state = (
+        await service.create(owner, 'create', suggestCharacter('fighter'))
+      ).session;
+    let calls = 0;
+    const providers = {
+      image: async () => {
+        calls++;
+        return { base64Data: 'aGVsbG8=', mediaType: 'image/jpeg' as const };
+      },
+      speech: async () => {
+        calls++;
+        return new Uint8Array([1]);
+      },
+      transcribe: async () => '',
+    };
+    const body =
+      kind === 'image'
+        ? { sceneRevision: state.world.sceneRevision }
+        : { messageId: state.messages[0].id, chunkIndex: 0, speaker: 'nestor' };
+    const request = () =>
+      new Request('http://localhost:3000/api/media', {
+        method: 'POST',
+        headers: {
+          Cookie: `dnd_owner=${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+    try {
+      assert.equal(
+        (await createMediaApi(service, providers)[kind](request(), state.id))
+          .status,
+        200,
+      );
+      let stale = true;
+      const delayed = new Proxy(store, {
+        get(target, key) {
+          if (key === 'media')
+            return (cacheKey: string) => {
+              if (stale) {
+                stale = false;
+                return undefined;
+              }
+              return target.media(cacheKey);
+            };
+          const value = Reflect.get(target, key);
+          return typeof value === 'function' ? value.bind(target) : value;
+        },
+      });
+      assert.equal(
+        (
+          await createMediaApi(new GameService(delayed), providers)[kind](
+            request(),
+            state.id,
+          )
+        ).status,
+        200,
+      );
+      assert.equal(calls, 1);
+    } finally {
+      store.close();
+    }
+  });
+}

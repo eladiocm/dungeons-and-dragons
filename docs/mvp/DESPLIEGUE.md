@@ -47,3 +47,15 @@ Ambas alternativas necesitan sustituir SQLite local; Vercel + Supabase permitir�
 Límites relevantes verificados: Vercel Hobby es para uso personal no comercial y tiene cuotas; Supabase Free incluye 500 MB de base de datos, 1 GB de archivos y puede pausar el proyecto por baja actividad durante 7 días. No activar planes de pago ni complementos facturables. Imágenes/audio deben tener retención acotada. El acceso y las cuotas requieren pruebas antes de publicar.
 
 Fuentes: [Vercel Hobby](https://vercel.com/docs/plans/hobby), [Supabase Free](https://supabase.com/pricing), [pausa por inactividad](https://supabase.com/docs/guides/platform/free-project-pausing). La recomendación de menor adaptación corresponde al análisis del repositorio actual; no garantiza servicio ilimitado ni disponibilidad permanente en planes gratuitos.
+
+## Implementación aprobada y preparada — 6 de noviembre de 2026
+
+Plataforma elegida por el usuario: Vercel Hobby + Supabase Free + Cloudflare Workers AI. Proyecto Vercel dungeons-and-dragons-eladiocm (Node 24, iad1), Supabase dedicado djfonndfgosmbjzarfwu (Postgres 17, us-east-1). Origen de producción configurado: https://dungeons-and-dragons-eladiocm.vercel.app. Consultar ESTADO para saber si el deployment está realmente listo; la existencia del proyecto no lo acredita.
+
+La sección inicial sobre SQLite corresponde al backend local. La implementación cloud ya usa SupabaseStore: tablas privadas, RPC autenticada por credencial backend separada, cuotas/CAS persistidos. No necesita disco ni Supabase Storage para esta caché acotada. La migración versionada está en supabase/migrations/202611060001_game_backend.sql; la configuración del hash de credencial se provisiona separadamente, nunca se versiona el secreto.
+
+Variables production cifradas: GAME_STORE=supabase; SUPABASE_URL; SUPABASE_PUBLISHABLE_KEY; DND_BACKEND_SECRET(64hex); SAVE_KEY_BASE64(32bytes); APP_ORIGIN; AI_PROVIDER=cloudflare; CLOUDFLARE_ACCOUNT_ID/TOKEN; ENABLE_IMAGES; DEMO_AI_DAILY_LIMIT=100. El usuario autorizó explícitamente su transferencia únicamente a ese proyecto. Sin valores en documentación/bundles/logs. No activar planes Pro ni complementos de pago. La máquina de build usa los valores gratuitos por defecto.
+
+Mantener origin exacto de producción y Node 24: el valor por defecto de Vercel era 26 y no corresponde a las APIs SQLite locales verificadas. Los previews no tienen credenciales production ni autorización para actuar sobre la base de producción. develop no publica automáticamente; integrar el commit verificado a main antes del release.
+
+La clave de copias es estable y debe respaldarse fuera del repositorio. `.env.cloud.local` se mantiene ignorada. No reemplazarla al redeploy. Cuota demo de 100 llamadas IA/día UTC; caché de 24 entradas de 2 MB; estado de 2 MB máximo y 200 sesiones totales. Límites explícitos para proteger planes gratuitos, sin prometer uso ilimitado. Los proyectos Supabase Free pueden pausarse tras baja actividad; Vercel Hobby es uso personal no comercial. Las pruebas físicas móviles siguen pendientes.

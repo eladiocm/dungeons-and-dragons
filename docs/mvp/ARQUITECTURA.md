@@ -1,6 +1,6 @@
 # Arquitectura del MVP
 
-Implementación 0.4.0, Next 16.4.5/React 19.3.1/TypeScript 7, runtime Node>=24.15. Se verificó Node 24.19; `node:sqlite` usa DatabaseSync, consultas preparadas y WAL. No depende de las APIs cambiadas de Node26.
+Implementación 0.4.1, Next 16.4.5/React 19.3.1/TypeScript 7, runtime Node>=24.15. Se verificó Node 24.19; `node:sqlite` usa DatabaseSync, consultas preparadas y WAL. No depende de las APIs cambiadas de Node26.
 
 ## Fronteras
 
@@ -73,3 +73,13 @@ SW guarda shell y recursos públicos. Excluye toda `/api`, cookies, audio y dato
 Antes de multijugador: cuentas/membresías por participante, sala, turnos y sincronización, cuotas compartidas, repositorio remoto o coordinación persistente. SQLite local no es multirregión. Mundo abierto necesitará generador/validación de lugares, actores, objetivos y finales; no basta cambiar un prompt.
 
 Grafo estructural actualizado desde `src`, sin claves, dependencias, sesiones ni medios. Sus diagnósticos incluyen referencias externas y relaciones combinadas: consultar `graphify-out/GRAPH_HEALTH.md`; no reemplaza la lectura del código ni garantiza extracción semántica de documentos.
+
+## Adaptación cloud 0.4.1
+
+SessionRepository permite resultados async; GameService y todas las rutas/media esperan el repositorio. SessionStore conserva SQLite local. SupabaseStore usa fetch HTTPS y una función SQL transaccional que opera tablas en dnd_private. Next sigue resolviendo reglas y aleatoriedad: prepare lee estado y detecta replay; commit bloquea sesión, revalida versión/clave/hash y publica estado+comando de forma atómica. Una transición especulativa que pierde CAS no publica sus dados ni consume recursos. No se reintenta la transición a escondidas.
+
+RPC pública dnd_backend exige una credencial privada de servidor de 256 bits además de la API key publicable. El hash está en configuración privada; SQL fijo, search_path vacío, tablas/esquema revocados a anon/authenticated y RLS sin políticas. Esa frontera backend separada permite mantener cookies privadas sin exponer service_role global. No equivale a un sistema de cuentas. La auditoría marca la función SECURITY DEFINER disponible a anon; se confirmó que todas las ramas validan la credencial primero y que clave pública/otro propietario no acceden al estado.
+
+amendNarration hace CAS con relectura acotada y modifica también pending/base/preview, sin perder acciones concurrentes. Narrate atiende jobs completados y relee si el mensaje ya se terminó. Imágenes/voz reconsultan la caché tras claim: un miss antiguo no justifica gastar otra inferencia. Cache común de 24 entradas de 2 MB, sin grabaciones de micrófono. Postgres limita estados a 2 MB/sesión, 200 sesiones globales y 120 MB de estados. La cuota diaria UTC de proveedores es compartida y atómica, inicialmente 100 llamadas.
+
+runtime-config rechaza Vercel sin Supabase o sin clave estable de copias. SAVE_KEY_BASE64 conserva la clave de la instalación, no depende del filesystem temporal. Los datos existentes del PC no se suben automáticamente; exportación/importación permite trasladar una copia cuando se conserva la misma clave.

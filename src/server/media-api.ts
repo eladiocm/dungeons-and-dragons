@@ -50,6 +50,11 @@ export function createMediaApi(
         const job = `image:${key}`;
         await service.store.claim(identity.hash, id, job, key);
         try {
+          const completed = await service.store.media(key);
+          if (completed) {
+            await service.store.releaseJob(id, job);
+            return apiResponse({ image: JSON.parse(completed) });
+          }
           const image = await providers.image(
             state.scene.imagePrompt,
             request.signal,
@@ -108,6 +113,11 @@ export function createMediaApi(
         const job = `speech:${key}`;
         await service.store.claim(owner(request).hash, id, job, key);
         try {
+          const completed = await service.store.media(key);
+          if (completed) {
+            await service.store.releaseJob(id, job);
+            return respond(Buffer.from(JSON.parse(completed).audio, 'base64'));
+          }
           const audio = await providers.speech(
             { text, speaker: raw.speaker as SpeechRequest['speaker'] },
             request.signal,
