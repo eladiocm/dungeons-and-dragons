@@ -1,6 +1,6 @@
 # Calabozos y Dragones — La última luz de Valdumbría
 
-MVP 0.4.1 en español para jugar una aventura de fantasía en solitario. Creas un personaje de nivel 1, revisas su ficha y decides cuándo iniciar. El Master interpreta tus acciones libres y narra; el motor aplica las reglas, los dados y los cambios de la partida.
+MVP 0.4.2 en español para jugar una aventura de fantasía en solitario. Creas un personaje de nivel 1, revisas su ficha y decides cuándo iniciar. El Master interpreta tus acciones libres y narra; el motor aplica las reglas, los dados y los cambios de la partida.
 
 **[Jugar la demo publicada](https://dungeons-and-dragons-eladiocm.vercel.app)**
 
@@ -33,6 +33,8 @@ Configuración recomendada:
 
 ```dotenv
 AI_PROVIDER=cloudflare
+GROQ_API_KEY=tu_clave_groq_free
+GEMINI_API_KEY=tu_clave_ai_studio_free_opcional
 CLOUDFLARE_ACCOUNT_ID=tu_account_id
 CLOUDFLARE_API_TOKEN=tu_token_workers_ai
 ENABLE_IMAGES=true
@@ -41,12 +43,20 @@ ENABLE_VOICE=true
 
 El token se usa exclusivamente en el servidor y requiere inferencia de Workers AI para la cuenta. Cloudflare ofrece una asignación gratuita compartida de **10.000 neuronas diarias**; texto, ilustraciones, voz y transcripción consumen esa cuota. Se renueva a las 00:00 UTC. Mantén **Workers Free** para que el agotamiento detenga las llamadas; este proyecto no activa planes ni proveedores de pago automáticamente. No se promete uso ilimitado.
 
-- Master: Llama 3.3 70B, salida JSON validada.
+- Master: Groq GPT-OSS 120B → Gemini 3.1 Flash-Lite → Cloudflare Llama 3.3, usando solo claves configuradas. Salida JSON validada por el motor. La cuota, los errores temporales y el JSON malformado permiten pasar al siguiente proveedor, sin repetir efectos del juego.
 - Ilustración: FLUX.1 schnell, solo ante cambios de escena. Siempre hay una ilustración local de respaldo.
-- Voz española: Aura 2; Néstor, Carina o Javier. Alternativa: voz del dispositivo, de calidad dependiente del sistema.
+- Voz del dispositivo por defecto para instalaciones nuevas, sin consumir nuestra API. Se conservan preferencias existentes. Voz natural opcional: Aura 2 (Néstor, Carina o Javier); su calidad es más uniforme pero consume la cuota de Cloudflare muy deprisa.
 - Dictado grabado: Whisper large v3 turbo. El reconocimiento en vivo usa la implementación del navegador cuando existe.
 
 Fuentes oficiales: [precios y cuota](https://developers.cloudflare.com/workers-ai/platform/pricing/), [Llama 3.3](https://developers.cloudflare.com/workers-ai/models/llama-3.3-70b-instruct-fp8-fast/), [FLUX](https://developers.cloudflare.com/workers-ai/models/flux-1-schnell/), [Aura español](https://developers.cloudflare.com/workers-ai/models/aura-2-es/), [Whisper](https://developers.cloudflare.com/workers-ai/models/whisper-large-v3-turbo/).
+
+Configura Groq en [su consola](https://console.groq.com/keys) y Gemini en un proyecto **sin facturación** de [AI Studio](https://aistudio.google.com/apikey). No pegues claves en el chat. `.env.providers.local` es un archivo privado de preparación; Next no lo carga por defecto: copiar sus variables a `.env.local` sin sobrescribir las demás, o iniciar con `node --env-file=.env.providers.local node_modules/next/dist/bin/next dev`. En Vercel deben configurarse como variables cifradas de servidor y desplegar de nuevo. Nunca `NEXT_PUBLIC_`.
+
+Las pausas por proveedor se comparten entre instancias mediante la migración `ai_cooldowns`; respetan Retry-After y no rotan cuentas ni claves para eludir límites. Se intenta cada proveedor una vez por operación. Si todos están agotados, se conserva la partida y el borrador. El contexto se limita al estado actual, diálogo reciente y conjuros accesibles, sin recortar el guardado.
+
+Groq publica límites por organización y modelo; revisa [los de tu cuenta](https://console.groq.com/docs/rate-limits). Gemini muestra la cuota efectiva por proyecto en [AI Studio](https://ai.google.dev/gemini-api/docs/rate-limits); confirma [el plan gratuito del modelo](https://ai.google.dev/gemini-api/docs/pricing). Los tokens pueden agotarse antes que las peticiones. Una acción suele necesitar interpretación y prosa: peticiones no equivalen a turnos. El tope `DEMO_AI_DAILY_LIMIT` admite hasta 1000 operaciones diarias compartidas (valor heredado 100 si no se configura); no amplía las cuotas de los proveedores ni asegura 1000 acciones.
+
+Para partidas largas selecciona **Voz del dispositivo** en ⋮ si ya tenías una voz natural guardada. Aura español utiliza 2727,27 neuronas por 1000 caracteres; 10.000 neuronas apenas cubren unos 3667 caracteres, antes de texto/imágenes/dictado. No existe una API gratuita ilimitada garantizada. Mantén todos los proyectos sin facturación; la aplicación no puede comprobar el plan de una clave por su formato.
 
 Para texto local:
 

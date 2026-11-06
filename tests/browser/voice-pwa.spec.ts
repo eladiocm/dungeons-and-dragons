@@ -21,6 +21,13 @@ function silence() {
   return b;
 }
 async function voice(page: Page) {
+  // Natural voice is now opt-in; these tests specifically verify its playback.
+  await page.addInitScript(() =>
+    localStorage.setItem(
+      'dnd-voice-v2',
+      JSON.stringify({ voice: 'nestor', automatic: true }),
+    ),
+  );
   await page.route('**/api/config', (r) =>
     r.fulfill({
       json: { configured: true, imagesEnabled: false, voiceEnabled: true },
@@ -30,6 +37,24 @@ async function voice(page: Page) {
     r.fulfill({ contentType: 'audio/wav', body: silence() }),
   );
 }
+
+test('new players default to device narration without spending hosted speech quota', async ({
+  page,
+}) => {
+  await page.route('**/api/config', (r) =>
+    r.fulfill({
+      json: { configured: true, imagesEnabled: false, voiceEnabled: true },
+    }),
+  );
+  await page.goto('/');
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => JSON.parse(localStorage.getItem('dnd-voice-v2') || '{}').voice,
+      ),
+    )
+    .toBe('device');
+});
 
 test('narration automatically starts after explicit game start with word tracking and pauses', async ({
   page,

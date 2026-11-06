@@ -27,6 +27,8 @@ const server = createServer(async (req, res) => {
           targetIds: ['bram'],
           options: { source: 'class' },
         };
+      else if (/(?<!\p{L})mara(?!\p{L})/u.test(t))
+        plan = { kind: 'interact', targetId: 'mara', method: 'talk' };
       else if (t.includes('ataco'))
         plan = { kind: 'attack', targetId: 'bram', weaponId: 'quarterstaff' };
       else if (t.includes('camino'))
@@ -53,7 +55,10 @@ const server = createServer(async (req, res) => {
         };
       else
         plan = { kind: 'interact', targetId: 'village-map', method: 'inspect' };
-      answer = { kind: 'action', plan };
+      answer =
+        t === 'le hablo'
+          ? { kind: 'clarify', question: '¿A quién quieres hablarle?' }
+          : { kind: 'action', plan };
     }
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ message: { content: JSON.stringify(answer) } }));

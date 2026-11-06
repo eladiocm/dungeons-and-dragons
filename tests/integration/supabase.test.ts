@@ -11,6 +11,34 @@ const repo = () =>
     publishableKey: process.env.SUPABASE_PUBLISHABLE_KEY || '',
     secret: process.env.DND_BACKEND_SECRET || '',
   });
+
+test('shared AI cooldown requires backend authority, survives instances and never shortens a pause', async () => {
+  const a = repo(),
+    b = repo();
+  // Roll back the synthetic provider pause: do not block real gameplay.
+  const previous = await a.readAiCooldown('groq');
+  const until = Math.max(Date.now() - 1000, previous);
+  await a.blockAi('groq', until);
+  await b.blockAi('groq', until - 1000);
+  assert.equal(await repo().readAiCooldown('groq'), until);
+  await assert.rejects(a.blockAi('other', until));
+  const response = await fetch(
+    `${process.env.SUPABASE_URL}/rest/v1/rpc/dnd_ai_state`,
+    {
+      method: 'POST',
+      headers: {
+        apikey: process.env.SUPABASE_PUBLISHABLE_KEY || '',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        p_secret: '0'.repeat(64),
+        p_op: 'block',
+        p_args: { provider: 'groq', until: Date.now() + 60000 },
+      }),
+    },
+  );
+  assert.equal((await response.json()).status, 403);
+});
 test('real Supabase keeps private state, atomic CAS, command replay, jobs and narration snapshots', async () => {
   const store = repo(),
     owner = `test-${randomUUID()}`,

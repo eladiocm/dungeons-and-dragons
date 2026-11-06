@@ -101,29 +101,53 @@ export class GameService {
       throw new RuleError('El Master no está configurado.', 503);
     const key = `intent:${input.id}`,
       job = await this.store.claim(owner, id, key, hash);
-    if (job.cached)
-      return {
-        session: await this.get(owner, id),
-        replayed: true,
-        clarification: JSON.parse(job.cached).clarification as
-          | string
-          | undefined,
-      };
+    const cached = job.cached
+      ? (JSON.parse(job.cached) as { clarification?: string })
+      : undefined;
+    if (job.cached && !cached?.clarification)
+      return { session: await this.get(owner, id), replayed: true };
     try {
-      const proposal = await this.master.interpret(
-        state,
-        input.actorId,
-        input.text,
-      );
+      const proposal = cached?.clarification
+        ? { kind: 'clarify' as const, question: cached.clarification }
+        : await this.master.interpret(state, input.actorId, input.text);
       if (proposal.kind === 'clarify') {
+        const result = await this.store.transact(
+          owner,
+          id,
+          expectedVersion,
+          input.id,
+          hash,
+          (current) => {
+            const next = structuredClone(current);
+            next.version++;
+            next.messages.push(
+              {
+                id: `${id}:user:${input.id}`,
+                role: 'user',
+                content: input.text,
+                sceneId: next.world.sceneId,
+              },
+              {
+                id: `${id}:clarification:${input.id}`,
+                role: 'assistant',
+                content: proposal.question,
+                sceneId: next.world.sceneId,
+                narrationPending: false,
+              },
+            );
+            if (next.messages.length > 120)
+              next.messages = [next.messages[0], ...next.messages.slice(-119)];
+            return next;
+          },
+        );
         await this.store.finishJob(
           id,
           key,
           JSON.stringify({ clarification: proposal.question }),
         );
         return {
-          session: await this.get(owner, id),
-          replayed: false,
+          session: publicSession(result.state),
+          replayed: result.replayed,
           clarification: proposal.question,
         };
       }

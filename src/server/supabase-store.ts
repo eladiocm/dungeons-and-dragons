@@ -25,10 +25,14 @@ export class SupabaseStore implements SessionRepository {
     this.config = { ...config, url: url.origin };
     this.fetcher = fetcher;
   }
-  async rpc<T>(op: string, args: Record<string, unknown>): Promise<T> {
+  async rpc<T>(
+    op: string,
+    args: Record<string, unknown>,
+    endpoint = 'dnd_backend',
+  ): Promise<T> {
     try {
       const response = await this.fetcher(
-        `${this.config.url}/rest/v1/rpc/dnd_backend`,
+        `${this.config.url}/rest/v1/rpc/${endpoint}`,
         {
           method: 'POST',
           cache: 'no-store',
@@ -204,5 +208,13 @@ export class SupabaseStore implements SessionRepository {
       bucket: `ai:${new Date().toISOString().slice(0, 10)}`,
       limit,
     });
+  }
+  async readAiCooldown(provider: string): Promise<number> {
+    return (
+      await this.rpc<{ until: number }>('get', { provider }, 'dnd_ai_state')
+    ).until;
+  }
+  async blockAi(provider: string, until: number): Promise<void> {
+    await this.rpc('block', { provider, until }, 'dnd_ai_state');
   }
 }

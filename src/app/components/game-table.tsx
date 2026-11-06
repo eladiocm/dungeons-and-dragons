@@ -27,6 +27,7 @@ export function GameTable({
     [unread, setUnread] = useState(false),
     scroll = useRef<HTMLDivElement>(null),
     follow = useRef(true),
+    submittedFrom = useRef<string | null>(null),
     composer = useRef<HTMLTextAreaElement>(null);
   const dictation = useDictation(
     session.id,
@@ -38,6 +39,14 @@ export function GameTable({
   const latest = session.messages.findLast((m) => m.role === 'assistant');
   // biome-ignore lint/correctness/useExhaustiveDependencies: Message content and pending phase change the scroll height.
   useEffect(() => {
+    if (
+      submittedFrom.current !== null &&
+      session.messages.at(-1)?.id !== submittedFrom.current
+    ) {
+      follow.current = true;
+      submittedFrom.current = null;
+      setUnread(false);
+    }
     if (follow.current && scroll.current) {
       const last = scroll.current.querySelector<HTMLElement>(
         'article:last-of-type',
@@ -58,6 +67,12 @@ export function GameTable({
     Boolean(session.pending) ||
     session.status === 'ended' ||
     dictating;
+  const submitAction = async () => {
+    if (blocked || !game.draft.trim() || submittedFrom.current !== null) return;
+    submittedFrom.current = session.messages.at(-1)?.id || '';
+    narration.stop();
+    if (!(await game.send())) submittedFrom.current = null;
+  };
   return (
     <div className="game-table">
       <ScenePanel
@@ -312,10 +327,7 @@ export function GameTable({
           className="composer"
           onSubmit={(e) => {
             e.preventDefault();
-            if (!blocked) {
-              narration.stop();
-              game.send();
-            }
+            void submitAction();
           }}
         >
           <label htmlFor="action-draft">Tu acción</label>
@@ -340,10 +352,7 @@ export function GameTable({
                 !e.nativeEvent.isComposing
               ) {
                 e.preventDefault();
-                if (!blocked && game.draft.trim()) {
-                  narration.stop();
-                  game.send();
-                }
+                if (!e.repeat) void submitAction();
               }
             }}
           />

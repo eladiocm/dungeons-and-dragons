@@ -12,6 +12,7 @@ export type JsonGenerator = (
   system: string,
   data: unknown,
   temperature?: number,
+  validate?: (value: unknown) => void,
 ) => Promise<unknown>;
 export interface Master {
   interpret(
@@ -42,15 +43,54 @@ function text(v: unknown, max: number): string {
     );
   return v.trim();
 }
+function interpretation(
+  raw: unknown,
+): Awaited<ReturnType<Master['interpret']>> {
+  if (
+    !record(raw) ||
+    Object.keys(raw).some((k) => !['kind', 'plan', 'question'].includes(k))
+  )
+    throw new RuleError(
+      'El Master no pudo interpretar esa acción. Prueba a concretarla.',
+      502,
+    );
+  if (raw.kind === 'clarify')
+    return { kind: 'clarify', question: text(raw.question, 500) };
+  if (raw.kind !== 'action')
+    throw new RuleError('Propuesta del Master no válida.', 502);
+  return { kind: 'action', plan: validatePlan(raw.plan) };
+}
+function narration(raw: unknown, ending: GameSession['ending']): string {
+  if (
+    !record(raw) ||
+    Object.keys(raw).some((k) => !['narrative', 'question'].includes(k))
+  )
+    throw new RuleError('La narración recibida no es válida.', 502);
+  const prose = text(raw.narrative, 2600),
+    question = ending ? '' : text(raw.question, 400);
+  if (question && (!question.includes('¿') || !question.endsWith('?')))
+    throw new RuleError('Falta la pregunta del Master.', 502);
+  return `${prose}${question ? `\n\n${question}` : ''}${ending ? `\n\n${ending.epilogue}` : ''}`;
+}
 function context(state: GameSession) {
   const view = publicSession(state);
   return {
-    ...view,
+    phase: view.phase,
+    status: view.status,
+    participants: view.participants,
+    battle: view.battle,
+    scene: {
+      id: view.scene.id,
+      title: view.scene.title,
+      description: view.scene.description,
+      connections: view.scene.connections,
+    },
+    ending: view.ending,
     messages: [
       view.messages[0],
       ...view.messages.slice(-6).filter((m) => m.id !== view.messages[0].id),
-    ],
-    events: view.events.slice(-5),
+    ].map(({ role, content }) => ({ role, content })),
+    events: view.events.slice(-3).map(({ type, facts }) => ({ type, facts })),
     world: { ...view.world, facts: view.world.facts.slice(-40) },
   };
 }
@@ -58,30 +98,33 @@ export function createMaster(json: JsonGenerator): Master {
   return {
     async interpret(state, actorId, input) {
       const view = context(state);
+      const actor = view.battle.actors[actorId];
+      if (!actor || !('innateMagic' in actor))
+        throw new RuleError('Ese personaje no puede realizar la acción.', 400);
+      const known = new Set([
+        ...(actor.spellcasting?.cantrips || []),
+        ...(actor.spellcasting?.book || []),
+        ...(actor.spellcasting?.prepared || []),
+        ...actor.innateMagic.flatMap((m) => [...m.cantrips, m.spell]),
+        ...(actor.elfMagic ? [actor.elfMagic.cantrip] : []),
+      ]);
       const raw = await json(
         INTERPRET,
         {
           actorId,
           intencion: input,
           estado: view,
-          conjuros: SPELLS,
+          conjuros: Object.fromEntries(
+            Object.entries(SPELLS).filter(([id]) => known.has(id)),
+          ),
           notasPrivadas: state.dmState.secrets,
         },
         0.15,
+        (value) => {
+          interpretation(value);
+        },
       );
-      if (
-        !record(raw) ||
-        Object.keys(raw).some((k) => !['kind', 'plan', 'question'].includes(k))
-      )
-        throw new RuleError(
-          'El Master no pudo interpretar esa acción. Prueba a concretarla.',
-          502,
-        );
-      if (raw.kind === 'clarify')
-        return { kind: 'clarify', question: text(raw.question, 500) };
-      if (raw.kind !== 'action')
-        throw new RuleError('Propuesta del Master no válida.', 502);
-      return { kind: 'action', plan: validatePlan(raw.plan) };
+      return interpretation(raw);
     },
     async narrate(state, message) {
       const event = state.events.find((e) => e.id === message.eventId);
@@ -99,20 +142,17 @@ export function createMaster(json: JsonGenerator): Master {
           objetivos: view.world.objectives,
           final: view.ending,
           baseConfirmada: message.content,
-          historial: view.messages.filter((m) => m.id !== message.id).slice(-6),
+          historial: view.messages
+            .filter((m) => m.id !== message.id)
+            .slice(-4)
+            .map(({ role, content }) => ({ role, content })),
         },
         0.75,
+        (value) => {
+          narration(value, state.ending);
+        },
       );
-      if (
-        !record(raw) ||
-        Object.keys(raw).some((k) => !['narrative', 'question'].includes(k))
-      )
-        throw new RuleError('La narración recibida no es válida.', 502);
-      const prose = text(raw.narrative, 2600),
-        question = state.ending ? '' : text(raw.question, 400);
-      if (question && (!question.includes('¿') || !question.endsWith('?')))
-        throw new RuleError('Falta la pregunta del Master.', 502);
-      return `${prose}${question ? `\n\n${question}` : ''}${state.ending ? `\n\n${state.ending.epilogue}` : ''}`;
+      return narration(raw, state.ending);
     },
   };
 }

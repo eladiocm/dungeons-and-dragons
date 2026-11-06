@@ -16,7 +16,12 @@ type Summary = {
   status: string;
   updatedAt: number;
 };
-type Operation = { url: string; body: unknown; clearDraft?: boolean };
+type Operation = {
+  url: string;
+  body: unknown;
+  clearDraft?: boolean;
+  draftSnapshot?: string;
+};
 type CommandInput<T = GameCommand> = T extends unknown
   ? Omit<T, 'id' | 'actorId'>
   : never;
@@ -147,16 +152,12 @@ export function useCampaign() {
         setOnline(true);
         adopt(result.session);
         retryOp.current = null;
-        if (result.clarification) {
-          setNotice(result.clarification);
-          return false;
-        }
         if (
           clearDraft &&
           typeof op.body === 'object' &&
           op.body &&
           'text' in op.body &&
-          draftRef.current.trim() === op.body.text
+          draftRef.current === op.draftSnapshot
         )
           setDraft('');
         const latest = result.session.messages.findLast(
@@ -220,10 +221,11 @@ export function useCampaign() {
   const send = () => {
     const s = stateRef.current,
       text = draftRef.current.trim();
-    if (!s || !text || !online) return;
-    void perform(
+    if (!s || !text || !online) return Promise.resolve(false);
+    return perform(
       {
         url: `/api/sessions/${s.id}/intent`,
+        draftSnapshot: draftRef.current,
         body: {
           expectedVersion: s.version,
           id: crypto.randomUUID(),

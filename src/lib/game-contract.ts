@@ -39,10 +39,12 @@ export const SAVE_KEY = 'dnd-adventure-v1';
 
 export class GameError extends Error {
   status: number;
-  constructor(message: string, status = 400) {
+  retryAfter?: string;
+  constructor(message: string, status = 400, retryAfter?: string) {
     super(message);
     this.name = 'GameError';
     this.status = status;
+    this.retryAfter = retryAfter;
   }
 }
 export function isRecord(value: unknown): value is Record<string, unknown> {

@@ -171,3 +171,82 @@ test('legacy adventure stays readable and a cached new game is read only offline
     page.getByRole('button', { name: 'Enviar acción' }),
   ).toBeDisabled();
 });
+
+test('Enter sends a clarification into persistent chat and Shift Enter keeps a newline', async ({
+  page,
+}) => {
+  await quiet(page);
+  await create(page);
+  const field = page.getByLabel('Tu acción');
+  await field.fill('Le hablo');
+  await field.press('Shift+Enter');
+  await expect(field).toHaveValue('Le hablo\n');
+  await field.fill('Le hablo');
+  await page.locator('.conversation').evaluate((el) => {
+    el.scrollTop = 0;
+    el.dispatchEvent(new Event('scroll'));
+  });
+  await field.press('Enter');
+  await expect(page.locator('.chat-message.user').last()).toContainText(
+    'Le hablo',
+  );
+  await expect(page.locator('.chat-message.assistant').last()).toContainText(
+    '¿A quién quieres hablarle?',
+  );
+  await expect(field).toHaveValue('');
+  const questionVisible = () =>
+    page
+      .locator('.chat-message.assistant')
+      .last()
+      .evaluate((el) => {
+        const r = el.getBoundingClientRect(),
+          c = el.closest('.conversation')?.getBoundingClientRect();
+        return Boolean(c && r.top >= c.top - 2 && r.top < c.bottom);
+      });
+  await expect.poll(questionVisible).toBe(true);
+  await page.reload();
+  await expect(page.locator('.chat-message.assistant').last()).toContainText(
+    '¿A quién quieres hablarle?',
+  );
+  await field.fill('Con Mara.');
+  await field.press('Enter');
+  await expect(page.locator('.chat-message.user')).toHaveCount(2);
+  await expect(field).toHaveValue('');
+});
+
+for (const newerDraft of [
+  'Otra idea que todavía no he enviado',
+  'Le hablo\n',
+]) {
+  test(`retrying a lost clarification preserves edited draft ${JSON.stringify(newerDraft)}`, async ({
+    page,
+  }) => {
+    await quiet(page);
+    await create(page);
+    let calls = 0;
+    await page.route('**/intent', async (route) => {
+      calls++;
+      if (calls === 1) {
+        await route.fetch();
+        await route.abort('failed');
+      } else await route.continue();
+    });
+    const field = page.getByLabel('Tu acción');
+    await field.fill('Le hablo');
+    await field.press('Enter');
+    await expect(
+      page.getByRole('button', { name: 'Reintentar la misma acción' }),
+    ).toBeVisible();
+    await expect(field).toHaveValue('Le hablo');
+    await field.fill(newerDraft);
+    await page
+      .getByRole('button', { name: 'Reintentar la misma acción' })
+      .click();
+    await expect(page.locator('.chat-message.user')).toHaveCount(1);
+    await expect(page.locator('.chat-message.assistant').last()).toContainText(
+      '¿A quién quieres hablarle?',
+    );
+    await expect(field).toHaveValue(newerDraft);
+    expect(calls).toBe(2);
+  });
+}

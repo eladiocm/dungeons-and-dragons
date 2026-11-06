@@ -48,7 +48,12 @@ function hasCloudflare(config: ProviderConfig): boolean {
 export function publicConfig(): PublicConfig {
   try {
     const config = environmentConfig();
-    const configured = config.provider === 'ollama' || hasCloudflare(config);
+    const configured =
+      config.provider === 'ollama' ||
+      hasCloudflare(config) ||
+      Boolean(
+        process.env.GROQ_API_KEY?.trim() || process.env.GEMINI_API_KEY?.trim(),
+      );
     return {
       provider:
         config.provider === 'ollama'
@@ -60,7 +65,7 @@ export function publicConfig(): PublicConfig {
         process.env.ENABLE_VOICE !== 'false' && hasCloudflare(config),
       message: configured
         ? undefined
-        : 'Falta configurar CLOUDFLARE_ACCOUNT_ID y CLOUDFLARE_API_TOKEN en .env.local. Sigue los pasos del README y reinicia el servidor.',
+        : 'Falta configurar un proveedor gratuito del Master en el servidor. Sigue los pasos del README y reinicia el servidor.',
     };
   } catch (error) {
     return {
@@ -99,6 +104,7 @@ async function post(
   body: unknown,
   signal?: AbortSignal,
   token?: string,
+  timeoutMs = 120000,
 ): Promise<unknown> {
   try {
     const response = await fetcher(url, {
@@ -110,11 +116,16 @@ async function post(
       body: JSON.stringify(body),
       cache: 'no-store',
       signal: AbortSignal.any([
-        AbortSignal.timeout(120000),
+        AbortSignal.timeout(timeoutMs),
         ...(signal ? [signal] : []),
       ]),
     });
-    if (!response.ok) throw upstreamError(response.status);
+    if (!response.ok) {
+      const error = upstreamError(response.status);
+      error.retryAfter = response.headers.get('Retry-After') || undefined;
+      await response.body?.cancel();
+      throw error;
+    }
     return await response.json();
   } catch (error) {
     if (error instanceof GameError) throw error;
@@ -140,6 +151,7 @@ export function createProvider(
     model: string,
     body: unknown,
     signal?: AbortSignal,
+    timeoutMs = 120000,
   ): Promise<Record<string, unknown>> {
     if (!hasCloudflare(config))
       throw new GameError(
@@ -152,6 +164,7 @@ export function createProvider(
       body,
       signal,
       config.token,
+      timeoutMs,
     );
     if (!isRecord(value) || value.success !== true || !isRecord(value.result))
       throw new GameError(
@@ -193,12 +206,17 @@ export function createProvider(
             : undefined;
       } else
         raw = (
-          await cloudflare(TEXT_MODEL, {
-            messages,
-            max_tokens: 1100,
-            temperature,
-            response_format: { type: 'json_object' },
-          })
+          await cloudflare(
+            TEXT_MODEL,
+            {
+              messages,
+              max_tokens: 1100,
+              temperature,
+              response_format: { type: 'json_object' },
+            },
+            undefined,
+            40000,
+          )
         ).response;
       if (isRecord(raw)) return raw;
       if (typeof raw !== 'string' || raw.length > 12000)

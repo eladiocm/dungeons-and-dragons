@@ -198,8 +198,9 @@ export function GameMenu({
             usa sus marcas de palabra cuando están disponibles.
           </p>
           <small>
-            La voz natural y las ilustraciones comparten la cuota gratuita del
-            servicio.
+            Para partidas largas, la voz del dispositivo no consume nuestra
+            cuota de IA. Su calidad depende del navegador. La voz natural y las
+            ilustraciones comparten una cuota gratuita limitada.
           </small>
         </details>
         <details className="settings-group">

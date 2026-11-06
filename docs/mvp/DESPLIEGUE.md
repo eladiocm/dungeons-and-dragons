@@ -63,3 +63,7 @@ La clave de copias es estable y debe respaldarse fuera del repositorio. `.env.cl
 ## Publicado y verificado
 
 URL: https://dungeons-and-dragons-eladiocm.vercel.app — deployment dpl_9ycTWyEMFSzcjgtHBZczbd2gKAbt, commit funcional 28fccf0, READY. Comprobadas API privada/guardado/copias/caché, Master/imagen/voz reales y navegador de escritorio/móvil con recarga. Consultar ESTADO/PRUEBAS. No se han activado planes de pago; el límite diario de la demo protege las cuotas compartidas y puede restringir temporalmente las inferencias.
+
+## Preparar routing gratuito 0.4.2
+
+Aplicadas en Supabase las migraciones ai_cooldowns y ai_cooldown_grants: pausas independientes del cache de medios, credencial backend y revocación explícita authenticated. Verificadas autoridad403 y persistencia entre instancias. Configurar GROQ_API_KEY y GEMINI_API_KEY cifradas solo en el proyecto Vercel autorizado, sin facturación en sus cuentas, y redesplegar. El archivo .env.providers.local no se carga automáticamente por Next ni se sube a Git. Claves aún vacías: activación y comprobación real pendientes. Cuando se activen, ajustar DEMO_AI_DAILY_LIMIT a1000 si procede (tope interno, no cuota garantizada). No cambiar SAVE_KEY_BASE64 ni credenciales existentes.

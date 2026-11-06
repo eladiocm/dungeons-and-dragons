@@ -1,28 +1,28 @@
 # Graph Report - dungeons-and-dragons  (2026-11-06)
 
 ## Corpus Check
-- 125 files · ~81,931 words
+- 131 files · ~85,764 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 4 file(s) not represented in the graph (top: (none) 2, .example 1, .css 1)
 
 ## Summary
-- 821 nodes · 2262 edges · 35 communities (27 shown, 8 thin omitted)
+- 841 nodes · 2315 edges · 43 communities (32 shown, 11 thin omitted)
 - Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 41 edges (avg confidence: 0.86)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `28fccf09`
+- Built from commit: `42c8285c`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
-- RuleError
+- session-actions.ts
 - GameSession
 - game-contract.ts
 - use-campaign.ts
 - engine.ts
-- game-service.ts
-- runtime.ts
+- session-api.ts
+- sessionApi
 - character.ts
 - voice-pwa.spec.ts
 - package.json
@@ -47,18 +47,26 @@
 - 2026-11-04-voice-scenes-pwa-design.md
 - specs/2026-11-05-free-deployment.md
 - postcss.config.mjs
+- game-service.ts
+- RuleError
+- runtime.ts
+- sessions.test.ts
+- SessionStore
+- DISENO.md
+- 2026-11-06-chat-clarifications.md
+- 2026-11-06-free-ai-routing.md
 
 ## God Nodes (most connected - your core abstractions)
-1. `RuleError` - 99 edges
+1. `RuleError` - 101 edges
 2. `executePlan()` - 38 edges
 3. `GameSession` - 33 edges
-4. `createCharacter()` - 28 edges
-5. `suggestCharacter()` - 24 edges
+4. `createCharacter()` - 29 edges
+5. `suggestCharacter()` - 25 edges
 6. `getHero()` - 23 edges
 7. `GameService` - 23 edges
-8. `SessionStore` - 22 edges
-9. `castSpell()` - 21 edges
-10. `SupabaseStore` - 21 edges
+8. `SupabaseStore` - 23 edges
+9. `SessionStore` - 22 edges
+10. `castSpell()` - 21 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `Task 4: Aventura y transiciones de sesión` --references--> `publicSession()`  [INFERRED]
@@ -75,39 +83,39 @@
 ## Import Cycles
 - None detected.
 
-## Communities (35 total, 8 thin omitted)
+## Communities (43 total, 11 thin omitted)
 
-### Community 0 - "RuleError"
+### Community 0 - "session-actions.ts"
 Cohesion: 0.10
-Nodes (80): Task 2: Dados, pruebas, daño, muerte y descansos, actionDice(), activateBeacon(), applyOperation(), creative(), interact(), skillCheck(), takeLens() (+72 more)
+Nodes (82): Task 2: Dados, pruebas, daño, muerte y descansos, actionDice(), activateBeacon(), applyOperation(), creative(), interact(), skillCheck(), takeLens() (+74 more)
 
 ### Community 1 - "GameSession"
-Cohesion: 0.06
-Nodes (12): CampaignMessage, GameSession, MaybePromise, SessionRepository, SessionSummary, decode(), encode(), SessionStore (+4 more)
+Cohesion: 0.14
+Nodes (7): GameSession, MaybePromise, SessionSummary, StoredResult, Config, SupabaseStore, repo()
 
 ### Community 2 - "game-contract.ts"
-Cohesion: 0.09
-Nodes (45): CORE, dynamic, GET(), Pending, request(), useGame(), AIProvider, createProvider() (+37 more)
+Cohesion: 0.07
+Nodes (53): CORE, dynamic, GET(), Pending, request(), useGame(), AIProvider, createProvider() (+45 more)
 
 ### Community 3 - "use-campaign.ts"
-Cohesion: 0.08
-Nodes (45): react, InstallEvent, PwaControls(), CharacterCreator(), Choices(), skillOptions(), spellOptions(), AbilityScores() (+37 more)
+Cohesion: 0.10
+Nodes (38): react, InstallEvent, PwaControls(), DiceTray(), GameMenu(), Narrator, GameTable(), Icon() (+30 more)
 
 ### Community 4 - "engine.ts"
-Cohesion: 0.08
-Nodes (49): ADVENTURE, adventureNpcs(), initialWorld(), npc(), object(), OPENING, SCENES, scores (+41 more)
+Cohesion: 0.07
+Nodes (48): ADVENTURE, adventureNpcs(), initialWorld(), npc(), object(), OPENING, SCENES, scores (+40 more)
 
-### Community 5 - "game-service.ts"
-Cohesion: 0.06
-Nodes (41): createCharacter(), inventory(), list(), record(), requireValue(), select(), suggestCharacter(), Roller (+33 more)
+### Community 5 - "session-api.ts"
+Cohesion: 0.21
+Nodes (15): createMediaApi(), fields(), apiFailure(), apiResponse(), commandBody(), exact(), id(), jsonBody() (+7 more)
 
-### Community 6 - "runtime.ts"
-Cohesion: 0.06
-Nodes (39): dynamic, POST(), runtime, dynamic, GET(), runtime, maxDuration, POST() (+31 more)
+### Community 6 - "sessionApi"
+Cohesion: 0.09
+Nodes (23): dynamic, POST(), runtime, dynamic, GET(), runtime, maxDuration, POST() (+15 more)
 
 ### Community 7 - "character.ts"
-Cohesion: 0.13
-Nodes (41): Task 1: Catálogo y creación verificable, CLASS_ICON, FEATURES, ABILITY_NAMES, ARMOR, BACKGROUNDS, CLASS_ITEMS, CLASSES (+33 more)
+Cohesion: 0.11
+Nodes (49): Task 1: Catálogo y creación verificable, CharacterCreator(), Choices(), CLASS_ICON, skillOptions(), spellOptions(), AbilityScores(), CharacterSheet() (+41 more)
 
 ### Community 8 - "voice-pwa.spec.ts"
 Cohesion: 0.06
@@ -134,16 +142,16 @@ Cohesion: 0.12
 Nodes (16): Acuerdos del usuario, Aventura propuesta: La última luz de Valdumbría, Catálogo inicial propuesto por el implementador, Decisiones propuestas y aprobadas por el usuario, Dictado de acciones, Diseño de la mesa, Enfoque propuesto, Etapas y condiciones de salida (+8 more)
 
 ### Community 14 - "Instrucciones de desarrollo para agentes"
-Cohesion: 0.15
-Nodes (11): Guía para agentes, Acuerdos, Arquitectura e invariantes, Contexto y estado real, Documentación y memoria, Guardado cloud y publicación, Instrucciones de desarrollo para agentes, Pruebas y evidencia (+3 more)
+Cohesion: 0.22
+Nodes (9): Acuerdos, Arquitectura e invariantes, Contexto y estado real, Documentación y memoria, Guardado cloud y publicación, Instrucciones de desarrollo para agentes, Pruebas y evidencia, Seguridad del trabajo (+1 more)
 
 ### Community 15 - "Mapa de archivos"
 Cohesion: 0.15
 Nodes (12): Global Constraints, Mapa de archivos, Review Focus, Revisión del plan, SRD solo MVP Implementation Plan, Task 3: Armas, rasgos y magia del catálogo, Task 4: Aventura y transiciones de sesión, Task 5: Persistencia, sesión privada y HTTP (+4 more)
 
 ### Community 16 - "mvp/README.md"
-Cohesion: 0.27
-Nodes (3): Manifiesto de contenido, Dirección visual de la mesa, Documentación del MVP
+Cohesion: 0.24
+Nodes (4): Guía para agentes, This is NOT the Next.js you know, Manifiesto de contenido, Documentación del MVP
 
 ### Community 17 - "Investigación y alcance de reglas"
 Cohesion: 0.20
@@ -166,8 +174,8 @@ Cohesion: 0.29
 Nodes (7): Adaptación cloud 0.4.1, Arquitectura del MVP, Dominio y flujo, Fronteras, Master y medios, Persistencia, PWA y evolución
 
 ### Community 22 - "Despliegue y uso en móvil"
-Cohesion: 0.29
-Nodes (7): Copias y recuperación, Despliegue y uso en móvil, Elección de alojamiento — revisión del 5 de noviembre de 2026, Implementación aprobada y preparada — 6 de noviembre de 2026, Publicación posterior, Requisitos del alojamiento, Restricción vigente: solo servicios gratuitos
+Cohesion: 0.25
+Nodes (8): Copias y recuperación, Despliegue y uso en móvil, Elección de alojamiento — revisión del 5 de noviembre de 2026, Implementación aprobada y preparada — 6 de noviembre de 2026, Publicación posterior, Publicado y verificado, Requisitos del alojamiento, Restricción vigente: solo servicios gratuitos
 
 ### Community 23 - "Estado del MVP 0.4.1"
 Cohesion: 0.33
@@ -185,25 +193,45 @@ Nodes (4): Aventura con IA gratuita, Comportamiento y límites, Enfoques conside
 Cohesion: 0.50
 Nodes (3): Constraints and review focus, Tasks, Voice, Scenes and PWA Implementation Plan
 
+### Community 35 - "game-service.ts"
+Cohesion: 0.16
+Nodes (8): publicSession(), GameCommand, GameService, hashPayload(), createMaster(), Master, SessionRepository, setup()
+
+### Community 36 - "RuleError"
+Cohesion: 0.25
+Nodes (17): choice(), flag(), keys(), number(), object(), operations(), point(), spellOptions() (+9 more)
+
+### Community 37 - "runtime.ts"
+Cohesion: 0.17
+Nodes (14): maxDuration, POST(), runtime, maxDuration, POST(), runtime, maxDuration, POST() (+6 more)
+
+### Community 38 - "sessions.test.ts"
+Cohesion: 0.19
+Nodes (4): AAD, SealedSave, createSessionApi(), file
+
+### Community 39 - "SessionStore"
+Cohesion: 0.21
+Nodes (3): decode(), encode(), SessionStore
+
 ## Knowledge Gaps
-- **219 isolated node(s):** `$schema`, `enabled`, `ignoreUnknown`, `enabled`, `indentStyle` (+214 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 290 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **8 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **223 isolated node(s):** `$schema`, `enabled`, `ignoreUnknown`, `enabled`, `indentStyle` (+218 more)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 297 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **11 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `gameService()` connect `runtime.ts` to `GameSession`, `game-contract.ts`, `game-service.ts`?**
+- **Why does `gameService()` connect `runtime.ts` to `GameSession`, `game-contract.ts`, `game-service.ts`, `engine.ts`, `SessionStore`?**
   _High betweenness centrality (0.004) - this node is a cross-community bridge._
-- **Why does `executePlan()` connect `RuleError` to `engine.ts`?**
-  _High betweenness centrality (0.004) - this node is a cross-community bridge._
-- **Why does `GameService` connect `game-service.ts` to `GameSession`, `engine.ts`?**
+- **Why does `GameService` connect `game-service.ts` to `session-actions.ts`, `RuleError`, `runtime.ts`?**
+  _High betweenness centrality (0.003) - this node is a cross-community bridge._
+- **Why does `transition()` connect `engine.ts` to `session-actions.ts`, `RuleError`?**
   _High betweenness centrality (0.003) - this node is a cross-community bridge._
 - **What connects `$schema`, `enabled`, `ignoreUnknown` to the rest of the system?**
-  _219 weakly-connected nodes found - possible documentation gaps or missing edges._
-- **Should `RuleError` be split into smaller, more focused modules?**
-  _Cohesion score 0.1040205703599813 - nodes in this community are weakly interconnected._
+  _223 weakly-connected nodes found - possible documentation gaps or missing edges._
+- **Should `session-actions.ts` be split into smaller, more focused modules?**
+  _Cohesion score 0.09630459126539753 - nodes in this community are weakly interconnected._
 - **Should `GameSession` be split into smaller, more focused modules?**
-  _Cohesion score 0.06346153846153846 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.13756613756613756 - nodes in this community are weakly interconnected._
 - **Should `game-contract.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.0893707033315706 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.06771929824561404 - nodes in this community are weakly interconnected._

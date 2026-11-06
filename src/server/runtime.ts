@@ -10,6 +10,7 @@ import { createSessionApi } from './session-api.ts';
 import type { SessionRepository } from './session-repository.ts';
 import { SessionStore } from './session-store.ts';
 import { SupabaseStore } from './supabase-store.ts';
+import { createTextRouter } from './text-router.ts';
 import { createTranscriber } from './transcription.ts';
 
 let service: GameService | undefined,
@@ -33,12 +34,30 @@ export function gameService(): GameService {
       store = new SessionStore(resolve(directory, 'game.sqlite'));
       key = readSaveKey(resolve(directory, 'save-key'));
     }
+    const provider = createProvider(),
+      shared = cloud;
+    const json =
+      process.env.AI_PROVIDER === 'ollama'
+        ? provider.json
+        : createTextRouter({
+            groqKey: process.env.GROQ_API_KEY,
+            geminiKey: process.env.GEMINI_API_KEY,
+            fallback: process.env.CLOUDFLARE_API_TOKEN?.trim()
+              ? provider.json
+              : undefined,
+            circuit: shared
+              ? {
+                  read: (key) => shared.readAiCooldown(key),
+                  block: (key, until) => shared.blockAi(key, until),
+                }
+              : undefined,
+          });
     service = new GameService(
       store,
       undefined,
       new SaveCodec(key),
-      createMaster((system, data, temperature) =>
-        infer(() => createProvider().json(system, data, temperature)),
+      createMaster((system, data, temperature, validate) =>
+        infer(() => json(system, data, temperature, validate)),
       ),
     );
   }

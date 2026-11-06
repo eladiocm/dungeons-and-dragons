@@ -14,6 +14,7 @@ test-results/
 .DS_Store
 .superpowers/
 .data/
+supabase/.temp/
 
 # Graphify local cache and machine paths; keep only public navigation artifacts.
 graphify-out/.*

@@ -23,6 +23,29 @@ const setup = async (json: JsonGenerator) => {
     actorId: session.participants[0].characterId,
   };
 };
+test('Master sends compact dialogue and only accessible spells without changing authoritative state', async () => {
+  const f = await setup(async (_system, raw) => {
+    const data = raw as {
+      estado: Record<string, unknown>;
+      conjuros: Record<string, unknown>;
+    };
+    assert.equal(data.estado.id, undefined);
+    assert.ok(!JSON.stringify(data.estado.messages).includes('imagePrompt'));
+    assert.ok(Object.keys(data.conjuros).length < 15);
+    assert.ok(!('magicMissile' in data.conjuros));
+    assert.ok('scene' in data.estado && 'battle' in data.estado);
+    return { kind: 'clarify', question: '¿Qué decides?' };
+  });
+  try {
+    await f.service.intent('owner', f.session.id, 0, {
+      id: 'compact',
+      actorId: f.actorId,
+      text: 'Miro alrededor',
+    });
+  } finally {
+    f.store.close();
+  }
+});
 test('Master interprets once and duplicate intent cannot repeat travel or provider work', async () => {
   let calls = 0;
   const f = await setup(async () => {
@@ -76,46 +99,63 @@ test('clarification is replayable without a die or a character action', async ()
     return { kind: 'clarify', question: '¿A quién quieres hablarle?' };
   });
   try {
+    const before = await f.service.get('owner', f.session.id);
     const command = { id: 'vague', actorId: f.actorId, text: 'Le hablo' };
     const a = await f.service.intent('owner', f.session.id, 0, command);
     assert.equal(a.clarification, '¿A quién quieres hablarle?');
-    assert.equal(a.session.version, 0);
-    await f.service.intent('owner', f.session.id, 0, command);
+    assert.equal(a.session.version, 1);
+    assert.deepEqual(a.session.world, before.world);
+    assert.deepEqual(a.session.battle, before.battle);
+    assert.deepEqual(a.session.events, before.events);
+    assert.equal(a.session.messages.at(-2)?.content, command.text);
+    assert.equal(a.session.messages.at(-2)?.role, 'user');
+    assert.equal(a.session.messages.at(-1)?.content, a.clarification);
+    assert.equal(a.session.messages.at(-1)?.narrationPending, false);
+    const replay = await f.service.intent('owner', f.session.id, 0, command);
+    assert.equal(replay.replayed, true);
+    assert.equal(replay.session.messages.length, a.session.messages.length);
     assert.equal(calls, 1);
   } finally {
     f.store.close();
   }
 });
-test('concurrent interpretation leases reject duplicates and stale AI responses cannot overwrite a newer turn', async () => {
-  let resolve!: (v: unknown) => void;
-  const f = await setup(
-    () =>
-      new Promise((r) => {
-        resolve = r;
-      }),
-  );
-  try {
-    const input = { id: 'slow', actorId: f.actorId, text: 'Avanzo' };
-    const first = f.service.intent('owner', f.session.id, 0, input);
-    await new Promise((r) => setTimeout(r, 5));
-    await assert.rejects(f.service.intent('owner', f.session.id, 0, input));
-    await f.service.execute('owner', f.session.id, 0, {
-      type: 'propose',
-      id: 'other',
-      actorId: f.actorId,
-      text: 'Miro el mapa',
-      plan: { kind: 'interact', targetId: 'village-map', method: 'inspect' },
-    });
-    resolve({ kind: 'action', plan: { kind: 'travel', destination: 'road' } });
-    await assert.rejects(first);
-    assert.equal(
-      (await f.service.get('owner', f.session.id)).scene.id,
-      'square',
+for (const responseKind of ['action', 'clarify'] as const) {
+  test(`concurrent ${responseKind} interpretation cannot overwrite a newer turn`, async () => {
+    let resolve!: (v: unknown) => void;
+    const f = await setup(
+      () =>
+        new Promise((r) => {
+          resolve = r;
+        }),
     );
-  } finally {
-    f.store.close();
-  }
-});
+    try {
+      const input = { id: 'slow', actorId: f.actorId, text: 'Avanzo' };
+      const first = f.service.intent('owner', f.session.id, 0, input);
+      await new Promise((r) => setTimeout(r, 5));
+      await assert.rejects(f.service.intent('owner', f.session.id, 0, input));
+      await f.service.execute('owner', f.session.id, 0, {
+        type: 'propose',
+        id: 'other',
+        actorId: f.actorId,
+        text: 'Miro el mapa',
+        plan: { kind: 'interact', targetId: 'village-map', method: 'inspect' },
+      });
+      resolve(
+        responseKind === 'clarify'
+          ? { kind: 'clarify', question: '¿A quién te refieres?' }
+          : { kind: 'action', plan: { kind: 'travel', destination: 'road' } },
+      );
+      await assert.rejects(first);
+      assert.equal(
+        (await f.service.get('owner', f.session.id)).scene.id,
+        'square',
+      );
+    } finally {
+      f.store.close();
+    }
+  });
+}
+
 test('narrative failure preserves resolved mechanics and retry changes prose only', async () => {
   let fail = true,
     calls = 0;
@@ -277,3 +317,79 @@ for (const cachedJob of [false, true]) {
     }
   });
 }
+
+test('the reply to a clarification includes the original dialogue in the Master context', async () => {
+  let calls = 0;
+  const f = await setup(async (_system, raw) => {
+    calls++;
+    const data = raw as {
+      intencion: string;
+      estado: { messages: { role: string; content: string }[] };
+    };
+    if (data.intencion === 'Le hablo')
+      return { kind: 'clarify', question: '¿A quién quieres hablarle?' };
+    assert.ok(
+      data.estado.messages.some(
+        (m) => m.role === 'user' && m.content === 'Le hablo',
+      ),
+    );
+    assert.ok(
+      data.estado.messages.some(
+        (m) =>
+          m.role === 'assistant' && m.content === '¿A quién quieres hablarle?',
+      ),
+    );
+    return {
+      kind: 'action',
+      plan: { kind: 'interact', targetId: 'mara', method: 'talk' },
+    };
+  });
+  try {
+    const first = await f.service.intent('owner', f.session.id, 0, {
+      id: 'vague',
+      actorId: f.actorId,
+      text: 'Le hablo',
+    });
+    const reply = await f.service.intent(
+      'owner',
+      f.session.id,
+      first.session.version,
+      { id: 'reply', actorId: f.actorId, text: 'Con Mara.' },
+    );
+    assert.equal(calls, 2);
+    assert.equal(
+      reply.session.messages.filter((m) => m.role === 'user').length,
+      2,
+    );
+  } finally {
+    f.store.close();
+  }
+});
+
+test('an old cached clarification is saved without repeating the provider call', async () => {
+  let calls = 0;
+  const f = await setup(async () => {
+    calls++;
+    throw Error('must reuse cached clarification');
+  });
+  try {
+    const input = { id: 'old-vague', actorId: f.actorId, text: 'Le hablo' },
+      hash = hashPayload({ expectedVersion: 0, input }),
+      key = `intent:${input.id}`;
+    f.store.claim('owner', f.session.id, key, hash);
+    f.store.finishJob(
+      f.session.id,
+      key,
+      JSON.stringify({ clarification: '¿A quién quieres hablarle?' }),
+    );
+    const result = await f.service.intent('owner', f.session.id, 0, input);
+    assert.equal(calls, 0);
+    assert.equal(result.session.version, 1);
+    assert.equal(
+      result.session.messages.at(-1)?.content,
+      '¿A quién quieres hablarle?',
+    );
+  } finally {
+    f.store.close();
+  }
+});

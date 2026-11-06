@@ -34,6 +34,7 @@ async function action(page: Page, text: string) {
   await page.getByLabel('Tu acción').fill(text);
   await page.getByRole('button', { name: 'Enviar acción' }).click();
   await expect(page.locator('main.app')).toHaveAttribute('aria-busy', 'false');
+  await expect(page.locator('.chat-message.user').last()).toContainText(text);
 }
 test('creation precedes play; choices can be reviewed; complete a prepared adventure with real private API', async ({
   page,

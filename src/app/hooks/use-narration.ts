@@ -20,7 +20,7 @@ export function useNarration(
   sessionId?: string,
   ready = true,
 ) {
-  const [voice, setVoice] = useState<Voice>('nestor'),
+  const [voice, setVoice] = useState<Voice>('device'),
     [automatic, setAutomatic] = useState(true),
     [status, setStatus] = useState<Status>('idle'),
     [hint, setHint] = useState<string | null>(null),
