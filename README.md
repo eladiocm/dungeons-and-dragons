@@ -2,6 +2,8 @@
 
 MVP 0.4.1 en español para jugar una aventura de fantasía en solitario. Creas un personaje de nivel 1, revisas su ficha y decides cuándo iniciar. El Master interpreta tus acciones libres y narra; el motor aplica las reglas, los dados y los cambios de la partida.
 
+**[Jugar la demo publicada](https://dungeons-and-dragons-eladiocm.vercel.app)**
+
 Basado en el **SRD 5.2.1**, con un catálogo reducido: guerrero, pícaro, clérigo y mago; humano, enano, mediano y alto elfo; cuatro trasfondos. La aventura original tiene objetivos y desenlaces por victoria, fracaso, retirada o muerte. Mundo abierto y multijugador quedan para otra etapa.
 
 ## Ejecutar en Windows
@@ -89,7 +91,7 @@ El teléfono necesita una dirección **HTTPS accesible y backend activo**; `loca
 
 ## Desarrollo, pruebas y arquitectura
 
-Trabajo en `develop`; la demo 0.4.1 está integrada en `main`. Alojamiento elegido: Vercel Hobby + Supabase Free; configuración y verificación de la URL en docs/mvp/DESPLIEGUE.md. El dominio puro está en `src/game`, persistencia/Master/API en `src/server` y mesa/hooks en `src/app`. No hay motor mecánico alternativo en la prosa de la IA.
+Trabajo en `develop`; la demo 0.4.1 está integrada en `main`. Demo publicada en Vercel Hobby + Supabase Free; URL y evidencia en docs/mvp/ESTADO.md. El dominio puro está en `src/game`, persistencia/Master/API en `src/server` y mesa/hooks en `src/app`. No hay motor mecánico alternativo en la prosa de la IA.
 
 ```powershell
 npm test

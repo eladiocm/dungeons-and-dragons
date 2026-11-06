@@ -59,3 +59,7 @@ Variables production cifradas: GAME_STORE=supabase; SUPABASE_URL; SUPABASE_PUBLI
 Mantener origin exacto de producción y Node 24: el valor por defecto de Vercel era 26 y no corresponde a las APIs SQLite locales verificadas. Los previews no tienen credenciales production ni autorización para actuar sobre la base de producción. develop no publica automáticamente; integrar el commit verificado a main antes del release.
 
 La clave de copias es estable y debe respaldarse fuera del repositorio. `.env.cloud.local` se mantiene ignorada. No reemplazarla al redeploy. Cuota demo de 100 llamadas IA/día UTC; caché de 24 entradas de 2 MB; estado de 2 MB máximo y 200 sesiones totales. Límites explícitos para proteger planes gratuitos, sin prometer uso ilimitado. Los proyectos Supabase Free pueden pausarse tras baja actividad; Vercel Hobby es uso personal no comercial. Las pruebas físicas móviles siguen pendientes.
+
+## Publicado y verificado
+
+URL: https://dungeons-and-dragons-eladiocm.vercel.app — deployment dpl_9ycTWyEMFSzcjgtHBZczbd2gKAbt, commit funcional 28fccf0, READY. Comprobadas API privada/guardado/copias/caché, Master/imagen/voz reales y navegador de escritorio/móvil con recarga. Consultar ESTADO/PRUEBAS. No se han activado planes de pago; el límite diario de la demo protege las cuotas compartidas y puede restringir temporalmente las inferencias.

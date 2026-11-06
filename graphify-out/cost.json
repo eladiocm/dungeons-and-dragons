@@ -1,13 +1,9 @@
 {
-  "runs": [
-    {
-      "date": "2026-11-05",
-      "files": 68,
-      "input_tokens": 0,
-      "output_tokens": 0,
-      "mode": "structural-code-only"
-    }
-  ],
-  "total_input_tokens": 0,
-  "total_output_tokens": 0
+  "mode": "code-only-local-AST",
+  "input_tokens": 0,
+  "output_tokens": 0,
+  "code_files": 125,
+  "nodes": 821,
+  "edges": 2262,
+  "note": "No AI calls; SQL dependency missing and documented in GRAPH_HEALTH.md"
 }

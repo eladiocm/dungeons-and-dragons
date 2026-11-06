@@ -20,28 +20,28 @@ Solo servicios gratuitos; trabajo develop; secretos fuera de Git/bundle/SW; no d
 ### Task 1: Contrato async y servicio/API
 Files: src/server/session-repository.ts, game-service.ts, session-api.ts, media-api.ts; tests/async-sessions.test.ts y pruebas existentes.
 Interfaces: SessionRepository métodos MaybePromise, GameService métodos async; mantener SessionStore sync local.
-- [ ] RED HTTP create/list/get/command/export/import sobre repositorio async con propiedad privada y replay.
-- [ ] Implementar contrato/await; adaptar pruebas al contrato async, sin cambiar reglas.
-- [ ] Unitarias/tipos/lint verdes y commit.
+- [x] RED HTTP create/list/get/command/export/import sobre repositorio async con propiedad privada y replay.
+- [x] Implementar contrato/await; adaptar pruebas al contrato async, sin cambiar reglas.
+- [x] Unitarias/tipos/lint verdes y commit.
 
 ### Task 2: Supabase transaccional
 Files: supabase/migrations/20261105_game_backend.sql, src/server/supabase-store.ts, tests/integration/supabase.test.ts.
 Interfaces: RPC dnd_backend(secret,op,args), SupabaseStore implementa SessionRepository; errores404/409/413/429 mapeados sin filtrar detallesSQL.
-- [ ] RED adapter ausente y pruebas reales sin esquema; crear pruebas ownership/replay/concurrentCAS/claims/pendingamend/cache/cuota.
-- [ ] Implementar SQL privado/RLS/grants/credencial hash y cliente fetch con timeout, CAS/JSONvalidado.
-- [ ] Aplicar migración solo al proyecto nuevo djfonndfgosmbjzarfwu; configurar credencial fuera del SQL versionado, verificar anon/otro propietario y advisors.
-- [ ] Pruebas reales verdes, commit.
+- [x] RED adapter ausente y pruebas reales sin esquema; crear pruebas ownership/replay/concurrentCAS/claims/pendingamend/cache/cuota.
+- [x] Implementar SQL privado/RLS/grants/credencial hash y cliente fetch con timeout, CAS/JSONvalidado.
+- [x] Aplicar migración solo al proyecto nuevo djfonndfgosmbjzarfwu; configurar credencial fuera del SQL versionado, verificar anon/otro propietario y advisors.
+- [x] Pruebas reales verdes, commit.
 
 ### Task 3: Runtime y cuotas
 Files: runtime.ts, runtime-config.ts, .env.example, media-api.ts si necesario, vercel.json, pruebas cloud.
 Interfaces: backend cloud explícito, clave copias SAVE_KEY_BASE64, URL/clave publicable/credencialRPC, presupuesto global de proveedores.
-- [ ] RED cloud sin configuración completa falla sin tocar disco; cuota remota limita llamadas y caché no gasta.
-- [ ] Elegir backend por GAME_STORE; SQLite solo local; límite compartido antes de cada inferencia. No imprimir secretos.
-- [ ] Tipos/lint/unit/build y27E2E verdes; commit.
+- [x] RED cloud sin configuración completa falla sin tocar disco; cuota remota limita llamadas y caché no gasta.
+- [x] Elegir backend por GAME_STORE; SQLite solo local; límite compartido antes de cada inferencia. No imprimir secretos.
+- [x] Tipos/lint/unit/build y27E2E verdes; commit.
 
 ### Task 4: Publicar y comprobar
 Files: docs/mvp/* README AGENTS; configuración Vercel y secretos remotos.
-- [ ] Crear proyecto Vercel de la cuenta Hobby, enlazar repositorio, región cercana DB; secretos solo production, origen HTTPS exacto.
-- [ ] Revisar diff/secretos, integrar/push main, crear deployment production del SHA verificado.
-- [ ] Esperar build, comprobar HTTPS/API/ownership/persistencia/creación/acciones/narración/PWA sobre URL real con cuota mínima.
-- [ ] Revisión final fresca según executing-plans, corregir hallazgos importantes con regresión; documentación/memoria/URL real. No declarar hardware móvil probado.
+- [x] Crear proyecto Vercel de la cuenta Hobby, enlazar repositorio, región cercana DB; secretos solo production, origen HTTPS exacto.
+- [x] Revisar diff/secretos, integrar/push main, crear deployment production del SHA verificado.
+- [x] Esperar build, comprobar HTTPS/API/ownership/persistencia/creación/acciones/narración/PWA sobre URL real con cuota mínima.
+- [x] Revisión final fresca según executing-plans, corregir hallazgos importantes con regresión; documentación/memoria/URL real. No declarar hardware móvil probado.

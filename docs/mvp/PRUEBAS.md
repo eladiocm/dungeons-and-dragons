@@ -1,6 +1,6 @@
 # Plan de aceptación y evidencia
 
-Estado 0.4.0: **141 unitarias y 27 E2E** (comprobación final del release cloud indicada abajo), tipos/lint/build correctos. Esta matriz conserva los criterios de diseño; la evidencia ejecutada y límites se registran en ESTADO.md. Micrófonos/instalación físicos Android/iOS no se consideran probados por usar simulaciones.
+Estado 0.4.0: **141 unitarias y 27 E2E correctas**, tipos/lint/build correctos. Esta matriz conserva los criterios de diseño; la evidencia ejecutada y límites se registran en ESTADO.md. Micrófonos/instalación físicos Android/iOS no se consideran probados por usar simulaciones.
 
 ## Principios
 
@@ -92,3 +92,5 @@ Navegador de pruebas: Brave/Chromium firmado, controlado por Playwright; se usa 
 137 unitarias iniciales verdes y 27 E2E completas sobre el servicio async. Integración real en Supabase Free: creación idempotente/hashdistinto409, propiedad privada404, dos escritores con una confirmación/CAS409, replay de dado sin nueva aleatoriedad, arrendamientos, enmiendas a pending/base/preview, reabrir repositorio, secreto inválido403, cuota persistida429 y caché. Tipos/lint/build correctos.
 
 Revisión independiente encontró dos carreras: miss de media antes de claim y narración con snapshot pending antiguo/job ya acabado. Cuatro regresiones nuevas se observaron fallar (2 inferencias por medio /1 inferencia de narración innecesaria) y pasan tras recheck bajo claim/cached+relectura.141 unitarias verdes; build/27 E2E repetidas después de los arreglos. No se considera verificado el despliegue hasta comprobar la URL y el flujo remoto. Escaneo del bundle del navegador: ninguna coincidencia de los tres secretos privados actuales.
+
+Resultado final cloud: tipos/lint/build y 27 E2E correctos después de las cuatro regresiones. Supabase real y producción HTTPS verificados. Script privado de smoke efectuó: creación, viaje, replay, recuperación, propietario ajeno 404, origen ajeno 403, copia cifrada ida/vuelta, manifest/standalone/SW. Con cuota real: intención de viaje al molino, prosa, imagen de 807.459 bytes, MP3 de 261.936 bytes decodificado: 43,656 s, repetición desde caché. Navegador firmado aislado abrió producción con datos sintéticos, controles/resaltado correctos, recargó conservando escena, sin errores JS ni overflow a 390 px. Capturas publicadas en entregables locales. No se simuló hardware probado ni campaña completa con IA real.
