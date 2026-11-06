@@ -1,0 +1,1 @@
+{"regions":["iad1"],"functions":{"src/app/api/**/*.ts":{"maxDuration":120}},"git":{"deploymentEnabled":{"develop":false}}}

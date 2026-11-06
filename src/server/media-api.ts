@@ -87,17 +87,41 @@ export function createMediaApi(
           throw new RuleError('Voz o segmento inválidos.');
         const text = splitSpeechText(message.content)[raw.chunkIndex as number];
         if (!text) throw new RuleError('No existe ese segmento de voz.');
-        const audio = await providers.speech(
-          { text, speaker: raw.speaker as SpeechRequest['speaker'] },
-          request.signal,
-        );
-        return new Response(new Uint8Array(audio).buffer, {
-          headers: {
-            'Content-Type': 'audio/mpeg',
-            'Cache-Control': 'private, no-store',
-            'X-Content-Type-Options': 'nosniff',
-          },
+        const key = hashPayload({
+          kind: 'speech',
+          session: id,
+          messageId: message.id,
+          text,
+          speaker: raw.speaker,
         });
+        const cached = await service.store.media(key);
+        const respond = (audio: Uint8Array) =>
+          new Response(new Uint8Array(audio).buffer, {
+            headers: {
+              'Content-Type': 'audio/mpeg',
+              'Cache-Control': 'private, no-store',
+              'X-Content-Type-Options': 'nosniff',
+            },
+          });
+        if (cached)
+          return respond(Buffer.from(JSON.parse(cached).audio, 'base64'));
+        const job = `speech:${key}`;
+        await service.store.claim(owner(request).hash, id, job, key);
+        try {
+          const audio = await providers.speech(
+            { text, speaker: raw.speaker as SpeechRequest['speaker'] },
+            request.signal,
+          );
+          await service.store.saveMedia(
+            key,
+            JSON.stringify({ audio: Buffer.from(audio).toString('base64') }),
+          );
+          await service.store.releaseJob(id, job);
+          return respond(audio);
+        } catch (error) {
+          await service.store.releaseJob(id, job);
+          throw error;
+        }
       } catch (error) {
         return apiFailure(error);
       }

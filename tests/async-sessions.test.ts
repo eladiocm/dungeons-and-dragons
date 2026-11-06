@@ -42,7 +42,7 @@ test('HTTP awaits remote storage for creation, private reads, commands and backu
     assert.equal((await (await api.list(req())).json()).sessions.length, 1);
     assert.equal((await (await api.get(req(), id)).json()).session.id, id);
     assert.equal(
-      (await api.get(req(undefined, 'dnd_owner=' + 'b'.repeat(43)), id)).status,
+      (await api.get(req(undefined, `dnd_owner=${'b'.repeat(43)}`), id)).status,
       404,
     );
     const body = {

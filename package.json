@@ -1,6 +1,6 @@
 {
   "name": "dungeons-and-dragons",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "private": true,
   "engines": {
     "node": ">=24.15.0"
@@ -13,7 +13,8 @@
     "format": "biome check --write src tests next.config.ts playwright.config.ts public/sw.js",
     "typecheck": "tsc --noEmit",
     "test": "node --disable-warning=ExperimentalWarning --experimental-strip-types --test tests/*.test.ts",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:integration": "node --env-file=.env.cloud.local --disable-warning=ExperimentalWarning --experimental-strip-types --test tests/integration/*.test.ts"
   },
   "dependencies": {
     "next": "16.4.5",

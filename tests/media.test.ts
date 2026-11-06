@@ -107,6 +107,29 @@ test('scene and speech use authorized IDs and reject raw prompts or text without
       ).status,
       200,
     );
+    // A different API instance (cold function) must reuse persisted speech.
+    const cold = createMediaApi(new GameService(store), {
+      image: async () => {
+        throw Error('unexpected image inference');
+      },
+      speech: async () => {
+        throw Error('unexpected repeated speech inference');
+      },
+      transcribe: async () => '',
+    });
+    const cachedAudio = await cold.speech(
+      req({
+        messageId: state.messages[0].id,
+        chunkIndex: 0,
+        speaker: 'nestor',
+      }),
+      state.id,
+    );
+    assert.equal(cachedAudio.status, 200);
+    assert.deepEqual(
+      new Uint8Array(await cachedAudio.arrayBuffer()),
+      new Uint8Array([1, 2, 3]),
+    );
     assert.equal(speeches, 1);
   } finally {
     store.close();
